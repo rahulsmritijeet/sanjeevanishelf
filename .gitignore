@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Kivy
+*.pyc
+*.kv~
+
+# Database
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log
+
+# Reports
+reports/
+*.xlsx
+*.pdf
+
+# Configuration (sensitive)
+config/settings.yaml
+config/market_rates.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+*.bak
+*.backup
+
+# Hardware config (device-specific)
+rfcomm.conf

@@ -1,0 +1,46 @@
+# Sanjeevani Shelf v1.1 - Godown Management System
+
+## Overview
+
+**Sanjeevani Shelf** is an industrial-grade, offline-first crop storage management system designed for rural panchayats in India. It manages inventory, quality control, billing, and farmer payments with full RFID tracking, moisture monitoring, and WhatsApp notifications.
+
+### Key Features
+
+- **3-Arduino Hardware**: RFID (RC522), Weight (HX711), Moisture (4 sensors) via HC-05 Bluetooth
+- **Multi-language**: English, Hindi, Bengali UI and notifications
+- **Offline-first**: Local SQLite database with WAL mode
+- **Payment Simulation**: Razorpay QR + simulation buttons (no real money)
+- **WhatsApp Integration**: Queue-based notifications with retry
+- **Session Management**: Full rollback/recovery on power failure
+- **Quality Control**: Moisture validation, grading, expiry management
+- **FIFO Inventory**: Capacity checks, stack allocation, confiscation
+
+---
+
+## Quick Start (Simulation Mode)
+
+### Prerequisites
+
+- Raspberry Pi 3B+ or better (or any Linux PC for development)
+- Python 3.11+
+- 16GB+ SD card
+
+### Installation
+
+```bash
+# Clone repository
+git clone <repo-url>
+cd sanjeevani_shelf
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Initialize database
+python3 -c "from database.migrations import apply_migrations; apply_migrations()"
+
+# Run in simulation mode
+python3 ui/app.py

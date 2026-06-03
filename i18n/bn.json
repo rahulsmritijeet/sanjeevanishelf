@@ -1,0 +1,115 @@
+{
+  "app_title": "সঞ্জীবনী শেল্ফ - গোডাউন ব্যবস্থাপনা",
+  "version": "v1.1",
+  
+  "startup": {
+    "select_language": "ভাষা নির্বাচন করুন",
+    "select_mode": "মোড নির্বাচন করুন",
+    "mode_storage": "সংরক্ষণ",
+    "mode_selling": "বিক্রয়",
+    "mode_buying": "ক্রয়",
+    "mode_admin": "প্রশাসন"
+  },
+  
+  "auth": {
+    "enter_pin": "পিন লিখুন",
+    "invalid_pin": "অবৈধ পিন",
+    "login": "লগইন",
+    "logout": "লগআউট"
+  },
+  
+  "farmer": {
+    "phone": "কৃষক ফোন",
+    "name": "নাম",
+    "village": "গ্রাম",
+    "search": "কৃষক খুঁজুন",
+    "register": "নতুন কৃষক নিবন্ধন করুন",
+    "not_found": "কৃষক পাওয়া যায়নি",
+    "registered": "কৃষক সফলভাবে নিবন্ধিত"
+  },
+  
+  "storage": {
+    "title": "সংরক্ষণ প্রক্রিয়া",
+    "scan_rfid": "RFID ট্যাগ স্ক্যান করুন",
+    "place_on_scale": "স্কেলে বস্তা রাখুন",
+    "tare_scale": "স্কেল শূন্য করুন",
+    "read_weight": "ওজন পড়ুন",
+    "insert_probe": "আর্দ্রতা প্রোব ঢোকান",
+    "read_moisture": "আর্দ্রতা পড়ুন",
+    "select_crop": "ফসলের ধরন নির্বাচন করুন",
+    "quality_check": "গুণমান পরীক্ষা",
+    "quality_passed": "গুণমান: পাস",
+    "quality_failed": "গুণমান: ব্যর্থ",
+    "capacity_ok": "ধারণক্ষমতা: ঠিক আছে",
+    "capacity_exceeded": "ধারণক্ষমতা অতিক্রম",
+    "stack_allocated": "স্ট্যাক বরাদ্দ",
+    "confirm_storage": "সংরক্ষণ নিশ্চিত করুন"
+  },
+  
+  "selling": {
+    "title": "বিক্রয় প্রক্রিয়া",
+    "scan_batch": "ব্যাচ RFID স্ক্যান করুন",
+    "batch_found": "ব্যাচ পাওয়া গেছে",
+    "batch_not_found": "ব্যাচ পাওয়া যায়নি",
+    "calculate_amount": "পরিমাণ গণনা করুন",
+    "market_rate": "বাজার দর",
+    "total_amount": "মোট পরিমাণ",
+    "payout_farmer": "কৃষকের পেমেন্ট",
+    "confirm_sale": "বিক্রয় নিশ্চিত করুন"
+  },
+  
+  "buying": {
+    "title": "ক্রয় প্রক্রিয়া",
+    "quality_check": "গুণমান পরীক্ষা",
+    "calculate_payment": "পেমেন্ট গণনা",
+    "msp_rate": "MSP দর",
+    "pay_farmer": "কৃষককে পেমেন্ট করুন",
+    "confirm_purchase": "ক্রয় নিশ্চিত করুন"
+  },
+  
+  "payment": {
+    "title": "পেমেন্ট",
+    "amount_due": "প্রদেয় পরিমাণ",
+    "scan_qr": "পেমেন্টের জন্য QR স্ক্যান করুন",
+    "payment_done": "পেমেন্ট সম্পন্ন",
+    "payout_done": "পেমেন্ট পাঠানো হয়েছে",
+    "simulation_notice": "(সিমুলেশন)",
+    "payment_successful": "পেমেন্ট সফল",
+    "payment_failed": "পেমেন্ট ব্যর্থ",
+    "receipt": "রসিদ"
+  },
+  
+  "admin": {
+    "title": "প্রশাসন ড্যাশবোর্ড",
+    "inventory": "ইনভেন্টরি",
+    "transactions": "লেনদেন",
+    "reports": "রিপোর্ট",
+    "expiry_check": "মেয়াদ পরীক্ষা চালান",
+    "export_data": "ডেটা রপ্তানি করুন",
+    "system_health": "সিস্টেম স্বাস্থ্য"
+  },
+  
+  "common": {
+    "ok": "ঠিক আছে",
+    "cancel": "বাতিল",
+    "back": "পিছনে",
+    "next": "পরবর্তী",
+    "confirm": "নিশ্চিত করুন",
+    "close": "বন্ধ করুন",
+    "error": "ত্রুটি",
+    "success": "সফল",
+    "loading": "লোড হচ্ছে...",
+    "kg": "কেজি",
+    "rs": "₹",
+    "percent": "%"
+  },
+  
+  "errors": {
+    "hardware_error": "হার্ডওয়্যার ত্রুটি",
+    "database_error": "ডেটাবেস ত্রুটি",
+    "network_error": "নেটওয়ার্ক ত্রুটি",
+    "invalid_input": "অবৈধ ইনপুট",
+    "operation_failed": "অপারেশন ব্যর্থ",
+    "try_again": "আবার চেষ্টা করুন"
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "app_title": "संजीवनी शेल्फ - गोदाम प्रबंधन",
+  "version": "v1.1",
+  
+  "startup": {
+    "select_language": "भाषा चुनें",
+    "select_mode": "मोड चुनें",
+    "mode_storage": "भंडारण",
+    "mode_selling": "बिक्री",
+    "mode_buying": "खरीद",
+    "mode_admin": "प्रशासन"
+  },
+  
+  "auth": {
+    "enter_pin": "पिन दर्ज करें",
+    "invalid_pin": "अमान्य पिन",
+    "login": "लॉगिन",
+    "logout": "लॉगआउट"
+  },
+  
+  "farmer": {
+    "phone": "किसान फोन",
+    "name": "नाम",
+    "village": "गाँव",
+    "search": "किसान खोजें",
+    "register": "नया किसान पंजीकृत करें",
+    "not_found": "किसान नहीं मिला",
+    "registered": "किसान सफलतापूर्वक पंजीकृत"
+  },
+  
+  "storage": {
+    "title": "भंडारण प्रक्रिया",
+    "scan_rfid": "RFID टैग स्कैन करें",
+    "place_on_scale": "तराजू पर बोरे रखें",
+    "tare_scale": "तराजू शून्य करें",
+    "read_weight": "वजन पढ़ें",
+    "insert_probe": "नमी जांच डालें",
+    "read_moisture": "नमी पढ़ें",
+    "select_crop": "फसल प्रकार चुनें",
+    "quality_check": "गुणवत्ता जांच",
+    "quality_passed": "गुणवत्ता: पास",
+    "quality_failed": "गुणवत्ता: असफल",
+    "capacity_ok": "क्षमता: ठीक",
+    "capacity_exceeded": "क्षमता पार",
+    "stack_allocated": "स्टैक आवंटित",
+    "confirm_storage": "भंडारण पुष्टि करें"
+  },
+  
+  "selling": {
+    "title": "बिक्री प्रक्रिया",
+    "scan_batch": "बैच RFID स्कैन करें",
+    "batch_found": "बैच मिला",
+    "batch_not_found": "बैच नहीं मिला",
+    "calculate_amount": "राशि गणना करें",
+    "market_rate": "बाजार दर",
+    "total_amount": "कुल राशि",
+    "payout_farmer": "किसान को भुगतान",
+    "confirm_sale": "बिक्री पुष्टि करें"
+  },
+  
+  "buying": {
+    "title": "खरीद प्रक्रिया",
+    "quality_check": "गुणवत्ता जांच",
+    "calculate_payment": "भुगतान गणना",
+    "msp_rate": "MSP दर",
+    "pay_farmer": "किसान को भुगतान करें",
+    "confirm_purchase": "खरीद पुष्टि करें"
+  },
+  
+  "payment": {
+    "title": "भुगतान",
+    "amount_due": "देय राशि",
+    "scan_qr": "भुगतान के लिए QR स्कैन करें",
+    "payment_done": "भुगतान पूर्ण",
+    "payout_done": "भुगतान भेजा गया",
+    "simulation_notice": "(सिमुलेशन)",
+    "payment_successful": "भुगतान सफल",
+    "payment_failed": "भुगतान विफल",
+    "receipt": "रसीद"
+  },
+  
+  "admin": {
+    "title": "प्रशासन डैशबोर्ड",
+    "inventory": "इन्वेंटरी",
+    "transactions": "लेन-देन",
+    "reports": "रिपोर्ट",
+    "expiry_check": "समाप्ति जांच चलाएं",
+    "export_data": "डेटा निर्यात करें",
+    "system_health": "सिस्टम स्वास्थ्य"
+  },
+  
+  "common": {
+    "ok": "ठीक",
+    "cancel": "रद्द करें",
+    "back": "पीछे",
+    "next": "आगे",
+    "confirm": "पुष्टि करें",
+    "close": "बंद करें",
+    "error": "त्रुटि",
+    "success": "सफलता",
+    "loading": "लोड हो रहा है...",
+    "kg": "किलो",
+    "rs": "₹",
+    "percent": "%"
+  },
+  
+  "errors": {
+    "hardware_error": "हार्डवेयर त्रुटि",
+    "database_error": "डेटाबेस त्रुटि",
+    "network_error": "नेटवर्क त्रुटि",
+    "invalid_input": "अमान्य इनपुट",
+    "operation_failed": "ऑपरेशन विफल",
+    "try_again": "कृपया पुनः प्रयास करें"
+  }
+}

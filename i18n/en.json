@@ -1,0 +1,115 @@
+{
+  "app_title": "Sanjeevani Shelf - Godown Management",
+  "version": "v1.1",
+  
+  "startup": {
+    "select_language": "Select Language",
+    "select_mode": "Select Mode",
+    "mode_storage": "Storage",
+    "mode_selling": "Selling",
+    "mode_buying": "Buying",
+    "mode_admin": "Admin"
+  },
+  
+  "auth": {
+    "enter_pin": "Enter PIN",
+    "invalid_pin": "Invalid PIN",
+    "login": "Login",
+    "logout": "Logout"
+  },
+  
+  "farmer": {
+    "phone": "Farmer Phone",
+    "name": "Name",
+    "village": "Village",
+    "search": "Search Farmer",
+    "register": "Register New Farmer",
+    "not_found": "Farmer not found",
+    "registered": "Farmer registered successfully"
+  },
+  
+  "storage": {
+    "title": "Storage Flow",
+    "scan_rfid": "Scan RFID Tag",
+    "place_on_scale": "Place sacks on scale",
+    "tare_scale": "Tare Scale",
+    "read_weight": "Read Weight",
+    "insert_probe": "Insert moisture probe",
+    "read_moisture": "Read Moisture",
+    "select_crop": "Select Crop Type",
+    "quality_check": "Quality Check",
+    "quality_passed": "Quality: PASSED",
+    "quality_failed": "Quality: FAILED",
+    "capacity_ok": "Capacity: OK",
+    "capacity_exceeded": "Capacity Exceeded",
+    "stack_allocated": "Stack Allocated",
+    "confirm_storage": "Confirm Storage"
+  },
+  
+  "selling": {
+    "title": "Selling Flow",
+    "scan_batch": "Scan Batch RFID",
+    "batch_found": "Batch Found",
+    "batch_not_found": "Batch Not Found",
+    "calculate_amount": "Calculate Amount",
+    "market_rate": "Market Rate",
+    "total_amount": "Total Amount",
+    "payout_farmer": "Payout to Farmer",
+    "confirm_sale": "Confirm Sale"
+  },
+  
+  "buying": {
+    "title": "Buying Flow",
+    "quality_check": "Quality Check",
+    "calculate_payment": "Calculate Payment",
+    "msp_rate": "MSP Rate",
+    "pay_farmer": "Pay Farmer",
+    "confirm_purchase": "Confirm Purchase"
+  },
+  
+  "payment": {
+    "title": "Payment",
+    "amount_due": "Amount Due",
+    "scan_qr": "Scan QR to Pay",
+    "payment_done": "PAYMENT DONE",
+    "payout_done": "PAYOUT DONE",
+    "simulation_notice": "(SIMULATION)",
+    "payment_successful": "Payment Successful",
+    "payment_failed": "Payment Failed",
+    "receipt": "Receipt"
+  },
+  
+  "admin": {
+    "title": "Admin Dashboard",
+    "inventory": "Inventory",
+    "transactions": "Transactions",
+    "reports": "Reports",
+    "expiry_check": "Run Expiry Check",
+    "export_data": "Export Data",
+    "system_health": "System Health"
+  },
+  
+  "common": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "back": "Back",
+    "next": "Next",
+    "confirm": "Confirm",
+    "close": "Close",
+    "error": "Error",
+    "success": "Success",
+    "loading": "Loading...",
+    "kg": "kg",
+    "rs": "₹",
+    "percent": "%"
+  },
+  
+  "errors": {
+    "hardware_error": "Hardware Error",
+    "database_error": "Database Error",
+    "network_error": "Network Error",
+    "invalid_input": "Invalid Input",
+    "operation_failed": "Operation Failed",
+    "try_again": "Please try again"
+  }
+}

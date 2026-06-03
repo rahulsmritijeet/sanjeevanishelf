@@ -1,0 +1,36 @@
+crops:
+  rice:
+    name_en: "Rice"
+    name_hi: "चावल"
+    name_bn: "চাল"
+    expiry_days: 365
+    moisture_max: 14.0
+    moisture_reject: 18.0
+    density: 0.75  # kg/liter
+    
+  wheat:
+    name_en: "Wheat"
+    name_hi: "गेहूं"
+    name_bn: "গম"
+    expiry_days: 365
+    moisture_max: 12.0
+    moisture_reject: 16.0
+    density: 0.78
+    
+  maize:
+    name_en: "Maize"
+    name_hi: "मक्का"
+    name_bn: "ভুট্টা"
+    expiry_days: 180
+    moisture_max: 13.0
+    moisture_reject: 17.0
+    density: 0.72
+    
+  pulses:
+    name_en: "Pulses"
+    name_hi: "दालें"
+    name_bn: "ডাল"
+    expiry_days: 270
+    moisture_max: 10.0
+    moisture_reject: 14.0
+    density: 0.80
