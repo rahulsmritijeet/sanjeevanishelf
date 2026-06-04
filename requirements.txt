@@ -1,6 +1,5 @@
-kivy==2.3.0
-kivy-deps.sdl2==0.7.0
-kivy-deps.glew==0.3.1
+PyQt5==5.15.9
+PyQt5-sip==12.13.0
 pyserial==3.5
 qrcode==7.4.2
 Pillow==10.2.0

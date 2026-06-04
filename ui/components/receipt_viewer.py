@@ -70,94 +70,66 @@ class ReceiptViewer(BoxLayout):
             return "[color=ff0000]No receipt data[/color]"
         
         # Header
-        receipt = f"[size=24][b]{data.get('godown_name', 'Godown')}[/b][/size]
-"
-        receipt += f"[size=18]{data.get('location', '')}[/size]
-"
+        receipt = f"[size=24][b]{data.get('godown_name', 'Godown')}[/b][/size]"
+        receipt += f"[size=18]{data.get('location', '')}[/size]"
         receipt += "=" * 50 + "
-
 "
         
         # Receipt number and date
-        receipt += f"[b]Receipt #:[/b] {data.get('receipt_number', 'N/A')}
-"
-        receipt += f"[b]Date:[/b] {data.get('receipt_date', 'N/A')}
-"
+        receipt += f"[b]Receipt #:[/b] {data.get('receipt_number', 'N/A')}"
+        receipt += f"[b]Date:[/b] {data.get('receipt_date', 'N/A')}"
         receipt += f"[b]Transaction:[/b] {data.get('txn_code', 'N/A')}
-
 "
         
         # Farmer details
-        receipt += "[b]Farmer Details:[/b]
-"
-        receipt += f"  Name: {data.get('farmer_name', 'N/A')}
-"
+        receipt += "[b]Farmer Details:[/b]"
+        receipt += f"  Name: {data.get('farmer_name', 'N/A')}"
         receipt += f"  Phone: {data.get('farmer_phone', 'N/A')}
-
 "
         
         # Transaction details
         txn_type = data.get('txn_type', 'storage')
-        receipt += f"[b]Transaction Type:[/b] {txn_type.upper()}
-"
-        receipt += f"[b]Crop:[/b] {data.get('crop_type', 'N/A')}
-"
-        receipt += f"[b]Weight:[/b] {data.get('weight_kg', 0)} kg
-"
+        receipt += f"[b]Transaction Type:[/b] {txn_type.upper()}"
+        receipt += f"[b]Crop:[/b] {data.get('crop_type', 'N/A')}"
+        receipt += f"[b]Weight:[/b] {data.get('weight_kg', 0)} kg"
         
         if data.get('batch_code'):
-            receipt += f"[b]Batch Code:[/b] {data.get('batch_code', 'N/A')}
-"
+            receipt += f"[b]Batch Code:[/b] {data.get('batch_code', 'N/A')}"
         
         if data.get('quality_grade'):
-            receipt += f"[b]Quality:[/b] Grade {data.get('quality_grade', 'N/A')}
-"
+            receipt += f"[b]Quality:[/b] Grade {data.get('quality_grade', 'N/A')}"
         
         if data.get('moisture_percent'):
-            receipt += f"[b]Moisture:[/b] {data.get('moisture_percent', 0)}%
-"
+            receipt += f"[b]Moisture:[/b] {data.get('moisture_percent', 0)}%"
         
-        receipt += "
-" + "-" * 50 + "
-
+        receipt += "" + "-" * 50 + "
 "
         
         # Amount
         amount = data.get('amount', 0)
         if txn_type == 'storage':
-            receipt += f"[size=20][b]Storage Fee: ₹{amount:.2f}[/b][/size]
-"
+            receipt += f"[size=20][b]Storage Fee: ₹{amount:.2f}[/b][/size]"
         elif txn_type == 'selling':
-            receipt += f"[size=20][b]Amount Paid: ₹{amount:.2f}[/b][/size]
-"
+            receipt += f"[size=20][b]Amount Paid: ₹{amount:.2f}[/b][/size]"
         elif txn_type == 'buying':
-            receipt += f"[size=20][b]Amount Received: ₹{amount:.2f}[/b][/size]
-"
+            receipt += f"[size=20][b]Amount Received: ₹{amount:.2f}[/b][/size]"
         
         # Payment details
-        receipt += f"[b]Payment Status:[/b] {data.get('payment_status', 'N/A')}
-"
-        receipt += f"[b]Payment Method:[/b] {data.get('payment_method', 'N/A')}
-"
+        receipt += f"[b]Payment Status:[/b] {data.get('payment_status', 'N/A')}"
+        receipt += f"[b]Payment Method:[/b] {data.get('payment_method', 'N/A')}"
         
         if data.get('payment_ref'):
-            receipt += f"[b]Payment Ref:[/b] {data.get('payment_ref', 'N/A')}
-"
+            receipt += f"[b]Payment Ref:[/b] {data.get('payment_ref', 'N/A')}"
         
         # Simulation notice
         if data.get('is_simulation'):
             receipt += "
-[color=ff0000][b][size=18]*** SIMULATION ONLY ***[/size][/b][/color]
-"
+[color=ff0000][b][size=18]*** SIMULATION ONLY ***[/size][/b][/color]"
         
+        receipt += "" + "=" * 50 + ""
+        receipt += "[b]Operator:[/b] " + data.get('operator_name', 'N/A') + ""
         receipt += "
-" + "=" * 50 + "
-"
-        receipt += "[b]Operator:[/b] " + data.get('operator_name', 'N/A') + "
-"
-        receipt += "
-Thank you for using our facility!
-"
+Thank you for using our facility!"
         
         return receipt
     
@@ -165,15 +137,13 @@ Thank you for using our facility!
         """Print receipt (placeholder - would integrate with printer)."""
         logger.info("Print receipt requested")
         # TODO: Integrate with thermal printer or PDF generation
-        print("
-" + "=" * 60)
+        print("" + "=" * 60)
         print("PRINTING RECEIPT (SIMULATION)")
         print("=" * 60)
         print(self.content_label.text.replace('[b]', '').replace('[/b]', '')
               .replace('[size=24]', '').replace('[size=18]', '').replace('[size=20]', '')
               .replace('[/size]', '').replace('[color=ff0000]', '').replace('[/color]', ''))
-        print("=" * 60 + "
-")
+        print("=" * 60 + "")
     
     def _on_close(self, *args):
         """Close receipt viewer."""

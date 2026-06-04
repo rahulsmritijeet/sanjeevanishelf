@@ -1,14 +1,14 @@
 """
-Startup Screen
+Startup Screen - PyQt5
 Language selection and mode selection.
 """
 
-from kivy.uix.screenmanager import Screen
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.textinput import TextInput
-from kivy.uix.popup import Popup
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QGridLayout, QLineEdit, QDialog, QMessageBox
+)
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt
 import logging
 import bcrypt
 from database.db_manager import db
@@ -16,185 +16,203 @@ from database.db_manager import db
 logger = logging.getLogger(__name__)
 
 
-class StartupScreen(Screen):
-    """Initial screen for language and mode selection."""
+class StartupScreen(QWidget):
+    """Startup screen with language and mode selection."""
     
-    def __init__(self, app_instance, **kwargs):
-        super().__init__(**kwargs)
-        self.app = app_instance
-        self.name = 'startup'
+    def __init__(self, app):
+        super().__init__()
+        self.app = app
         self.selected_language = 'en'
         self.selected_mode = None
-        
         self._build_ui()
     
     def _build_ui(self):
         """Build startup UI."""
-        layout = BoxLayout(orientation='vertical', padding=20, spacing=20)
+        layout = QVBoxLayout()
+        layout.setSpacing(20)
+        layout.setContentsMargins(20, 20, 20, 20)
         
         # Title
-        title = Label(
-            text='[b]Sanjeevani Shelf v1.1[/b]
-Godown Management System',
-            markup=True,
-            font_size='32sp',
-            size_hint_y=0.2,
-            halign='center'
-        )
-        layout.add_widget(title)
+        title = QLabel('Sanjeevani Shelf v1.1\nGodown Management System')
+        title_font = QFont()
+        title_font.setPointSize(24)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title, stretch=20)
         
         # Language selection
-        lang_label = Label(
-            text='Select Language / भाषा चुनें / ভাষা নির্বাচন করুন',
-            font_size='24sp',
-            size_hint_y=0.1
-        )
-        layout.add_widget(lang_label)
+        lang_label = QLabel('Select Language / भाषा चुनें / ভাষা নির্বাচন করুন')
+        lang_font = QFont()
+        lang_font.setPointSize(14)
+        lang_label.setFont(lang_font)
+        layout.addWidget(lang_label)
         
-        # Import language selector
-        from ui.components.language_selector import LanguageSelector
-        self.lang_selector = LanguageSelector()
-        self.lang_selector.on_language_change = self._on_language_changed
-        layout.add_widget(self.lang_selector)
+        # Language buttons
+        lang_layout = QHBoxLayout()
+        langs = [('en', 'English'), ('hi', 'हिन्दी'), ('bn', 'বাংলা')]
+        
+        self.lang_buttons = {}
+        for lang_code, lang_name in langs:
+            btn = QPushButton(lang_name)
+            btn_font = QFont()
+            btn_font.setPointSize(12)
+            btn.setFont(btn_font)
+            btn.setFixedHeight(50)
+            btn.clicked.connect(lambda checked, lc=lang_code: self._on_language_selected(lc))
+            
+            if lang_code == self.selected_language:
+                btn.setStyleSheet("background-color: #33CC33; color: white; font-weight: bold;")
+            else:
+                btn.setStyleSheet("background-color: #CCCCCC; color: black;")
+            
+            self.lang_buttons[lang_code] = btn
+            lang_layout.addWidget(btn)
+        
+        layout.addLayout(lang_layout, stretch=10)
         
         # Mode selection
-        mode_label = Label(
-            text=self._t('startup.select_mode'),
-            font_size='24sp',
-            size_hint_y=0.1
-        )
-        layout.add_widget(mode_label)
+        mode_label = QLabel(self.app.translate('startup.select_mode', self.selected_language))
+        mode_font = QFont()
+        mode_font.setPointSize(14)
+        mode_label.setFont(mode_font)
+        layout.addWidget(mode_label)
         
-        mode_buttons = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.3)
-        
+        # Mode buttons
+        mode_grid = QGridLayout()
         modes = [
-            ('storage', 'startup.mode_storage', (0.2, 0.6, 0.8, 1)),
-            ('selling', 'startup.mode_selling', (0.8, 0.6, 0.2, 1)),
-            ('buying', 'startup.mode_buying', (0.2, 0.8, 0.2, 1)),
-            ('admin', 'startup.mode_admin', (0.6, 0.2, 0.6, 1))
+            ('storage', 'startup.mode_storage', '#3366FF'),
+            ('selling', 'startup.mode_selling', '#FFAA00'),
+            ('buying', 'startup.mode_buying', '#33CC33'),
+            ('admin', 'startup.mode_admin', '#CC33FF'),
         ]
         
-        for mode_id, label_key, color in modes:
-            btn = Button(
-                text=self._t(label_key),
-                font_size='24sp',
-                bold=True,
-                background_color=color
-            )
-            btn.mode_id = mode_id
-            btn.bind(on_press=self._on_mode_selected)
-            mode_buttons.add_widget(btn)
+        for i, (mode_id, label_key, color) in enumerate(modes):
+            btn = QPushButton(self.app.translate(label_key, self.selected_language))
+            btn.setFixedHeight(80)
+            btn_font = QFont()
+            btn_font.setPointSize(12)
+            btn_font.setBold(True)
+            btn.setFont(btn_font)
+            btn.setStyleSheet(f"background-color: {color}; color: white; border-radius: 5px; font-weight: bold;")
+            btn.clicked.connect(lambda checked, mid=mode_id: self._on_mode_selected(mid))
+            
+            mode_grid.addWidget(btn, i // 2, i % 2)
         
-        layout.add_widget(mode_buttons)
+        layout.addLayout(mode_grid, stretch=30)
         
         # Footer
-        footer = Label(
-            text='Simulation Mode' if self.app.config.get('simulation_mode') else 'Production Mode',
-            font_size='16sp',
-            size_hint_y=0.05,
-            color=(1, 0, 0, 1) if self.app.config.get('simulation_mode') else (0, 1, 0, 1)
-        )
-        layout.add_widget(footer)
+        sim_mode = self.app.app_config.get('simulation_mode', False)
+        footer_text = '⚠️ SIMULATION MODE' if sim_mode else '✓ PRODUCTION MODE'
+        footer = QLabel(footer_text)
+        footer_font = QFont()
+        footer_font.setPointSize(10)
+        footer.setFont(footer_font)
+        footer.setAlignment(Qt.AlignCenter)
         
-        self.add_widget(layout)
+        if sim_mode:
+            footer.setStyleSheet("color: red; font-weight: bold;")
+        else:
+            footer.setStyleSheet("color: green; font-weight: bold;")
+        
+        layout.addWidget(footer)
+        
+        self.setLayout(layout)
     
-    def _t(self, key):
-        """Translate text using current language."""
-        return self.app.translate(key, self.selected_language)
-    
-    def _on_language_changed(self, lang_code):
-        """Handle language change."""
+    def _on_language_selected(self, lang_code):
+        """Handle language selection."""
         self.selected_language = lang_code
         self.app.current_language = lang_code
         logger.info(f"Language changed to {lang_code}")
-        # TODO: Update all UI text
+        
+        # Update button colors
+        for lc, btn in self.lang_buttons.items():
+            if lc == lang_code:
+                btn.setStyleSheet("background-color: #33CC33; color: white; font-weight: bold;")
+            else:
+                btn.setStyleSheet("background-color: #CCCCCC; color: black;")
     
-    def _on_mode_selected(self, button):
+    def _on_mode_selected(self, mode_id):
         """Handle mode selection."""
-        self.selected_mode = button.mode_id
-        logger.info(f"Mode selected: {self.selected_mode}")
+        self.selected_mode = mode_id
+        logger.info(f"Mode selected: {mode_id}")
         
-        # Show PIN entry popup
-        self._show_pin_popup()
+        # Show PIN entry dialog
+        self._show_pin_dialog()
     
-    def _show_pin_popup(self):
-        """Show operator PIN entry."""
-        content = BoxLayout(orientation='vertical', padding=10, spacing=10)
+    def _show_pin_dialog(self):
+        """Show PIN entry dialog."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Operator Login')
+        dialog.setGeometry(150, 100, 500, 300)
+        dialog.setStyleSheet("background-color: white;")
         
-        label = Label(
-            text=self._t('auth.enter_pin'),
-            font_size='20sp',
-            size_hint_y=0.2
-        )
-        content.add_widget(label)
+        layout = QVBoxLayout()
         
-        pin_input = TextInput(
-            multiline=False,
-            password=True,
-            font_size='24sp',
-            size_hint_y=0.3
-        )
-        content.add_widget(pin_input)
+        # Title
+        title = QLabel(self.app.translate('auth.enter_pin', self.selected_language))
+        title_font = QFont()
+        title_font.setPointSize(14)
+        title.setFont(title_font)
+        layout.addWidget(title)
         
-        btn_layout = BoxLayout(size_hint_y=0.3, spacing=10)
+        # PIN input
+        pin_input = QLineEdit()
+        pin_input.setEchoMode(QLineEdit.Password)
+        pin_input.setFont(QFont('Arial', 18))
+        pin_input.setFixedHeight(50)
+        layout.addWidget(pin_input)
         
-        popup = Popup(
-            title='Operator Login',
-            content=content,
-            size_hint=(0.6, 0.5),
-            auto_dismiss=False
-        )
+        # Status message
+        status = QLabel('')
+        status.setStyleSheet("color: red; font-weight: bold;")
+        layout.addWidget(status)
         
-        def on_login(*args):
-            pin = pin_input.text
+        # Buttons
+        btn_layout = QHBoxLayout()
+        
+        def on_login():
+            pin = pin_input.text()
             user = self._verify_pin(pin)
+            
             if user:
-                popup.dismiss()
+                dialog.accept()
                 self.app.current_user = user
                 self.app.current_mode = self.selected_mode
-                self._navigate_to_mode()
+                self.app.show_screen(self.selected_mode)
             else:
-                pin_input.text = ''
-                label.text = self._t('auth.invalid_pin')
-                label.color = (1, 0, 0, 1)
+                pin_input.setText('')
+                status.setText(self.app.translate('auth.invalid_pin', self.selected_language))
         
-        btn_login = Button(text=self._t('auth.login'), font_size='20sp')
-        btn_login.bind(on_press=on_login)
-        btn_layout.add_widget(btn_login)
+        btn_login = QPushButton(self.app.translate('auth.login', self.selected_language))
+        btn_login.setFixedHeight(50)
+        btn_login.setFont(QFont('Arial', 12))
+        btn_login.clicked.connect(on_login)
+        btn_layout.addWidget(btn_login)
         
-        btn_cancel = Button(text=self._t('common.cancel'), font_size='20sp')
-        btn_cancel.bind(on_press=popup.dismiss)
-        btn_layout.add_widget(btn_cancel)
+        btn_cancel = QPushButton(self.app.translate('common.cancel', self.selected_language))
+        btn_cancel.setFixedHeight(50)
+        btn_cancel.setFont(QFont('Arial', 12))
+        btn_cancel.clicked.connect(dialog.reject)
+        btn_layout.addWidget(btn_cancel)
         
-        content.add_widget(btn_layout)
+        layout.addLayout(btn_layout)
         
-        popup.open()
+        dialog.setLayout(layout)
+        dialog.exec_()
     
     def _verify_pin(self, pin):
         """Verify operator PIN."""
-        # Hash the entered PIN and compare with database
-        users = db.fetchall("SELECT * FROM users WHERE active = 1")
-        
-        for user in users:
-            stored_hash = user['pin_hash']
-            if bcrypt.checkpw(pin.encode('utf-8'), stored_hash.encode('utf-8')):
-                logger.info(f"User authenticated: {user['username']}")
-                return dict(user)
+        try:
+            users = db.fetchall("SELECT * FROM users WHERE active = 1")
+            
+            for user in users:
+                stored_hash = user['pin_hash']
+                if bcrypt.checkpw(pin.encode('utf-8'), stored_hash.encode('utf-8')):
+                    logger.info(f"User authenticated: {user['username']}")
+                    return dict(user)
+        except Exception as e:
+            logger.error(f"PIN verification error: {e}")
         
         logger.warning(f"Authentication failed for PIN")
         return None
-    
-    def _navigate_to_mode(self):
-        """Navigate to selected mode screen."""
-        screen_map = {
-            'storage': 'storage',
-            'selling': 'selling',
-            'buying': 'buying',
-            'admin': 'admin'
-        }
-        
-        screen_name = screen_map.get(self.selected_mode)
-        if screen_name:
-            self.manager.current = screen_name
-        else:
-            logger.error(f"Unknown mode: {self.selected_mode}")

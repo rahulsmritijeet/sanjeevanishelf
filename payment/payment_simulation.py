@@ -48,14 +48,12 @@ class PaymentSimulator:
             })
             
             logger.info(f"[SIM] Payment received: ₹{amount} for txn {transaction_id}")
-            print(f"
-{'='*60}")
+            print(f"{'='*60}")
             print(f"PAYMENT SIMULATION - RECEIVED")
             print(f"Transaction ID: {transaction_id}")
             print(f"Amount: ₹{amount}")
             print(f"Reference: {payment_ref}")
-            print(f"{'='*60}
-")
+            print(f"{'='*60}")
             
             return True, payment_ref
         
@@ -94,16 +92,14 @@ class PaymentSimulator:
             })
             
             logger.info(f"[SIM] Payout sent: ₹{amount} to farmer {farmer_id}")
-            print(f"
-{'='*60}")
+            print(f"{'='*60}")
             print(f"PAYOUT SIMULATION - SENT")
             print(f"Transaction ID: {transaction_id}")
             print(f"Farmer ID: {farmer_id}")
             print(f"Amount: ₹{amount}")
             print(f"Bank Account: {bank_account}")
             print(f"Reference: {payout_ref}")
-            print(f"{'='*60}
-")
+            print(f"{'='*60}")
             
             return True, payout_ref
         

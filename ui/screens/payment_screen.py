@@ -25,7 +25,7 @@ class PaymentScreen(Screen):
         self.app = app_instance
         self.name = 'payment'
         
-        self.razorpay = RazorpayHandler(app_instance.config, simulation=app_instance.config.get('simulation_mode'))
+        self.razorpay = RazorpayHandler(app_instance.app_config, simulation=app_instance.app_config.get('simulation_mode'))
         self.payment_sim = PaymentSimulator()
         
         self.amount = 0
@@ -129,9 +129,9 @@ class PaymentScreen(Screen):
         if self.transaction_type == 'storage':
             # Payment received button
             btn_paid = Button(
-                text=f'[b]PAYMENT DONE
+                text=f'''[b]PAYMENT DONE
 ₹{self.amount:.2f}
-(SIMULATION)[/b]',
+(SIMULATION)[/b]''',
                 markup=True,
                 font_size='24sp',
                 background_color=(0.2, 0.8, 0.2, 1)
@@ -142,9 +142,9 @@ class PaymentScreen(Screen):
         elif self.transaction_type in ['selling', 'buying']:
             # Payout sent button
             btn_payout = Button(
-                text=f'[b]PAYOUT DONE
+                text=f'''[b]PAYOUT DONE
 ₹{self.amount:.2f}
-(SIMULATION)[/b]',
+(SIMULATION)[/b]''',
                 markup=True,
                 font_size='24sp',
                 background_color=(0.2, 0.8, 0.2, 1)

@@ -131,16 +131,13 @@ class WhatsAppQueue:
         try:
             if self.mode == 'simulation':
                 # Simulation mode: just log
-                logger.info(f"[SIM] WhatsApp to {phone}:
-{text}")
-                print(f"
-{'='*60}")
+                logger.info(f"[SIM] WhatsApp to {phone}:{text}")
+                print(f"{'='*60}")
                 print(f"WHATSAPP MESSAGE (SIMULATION)")
                 print(f"To: {phone}")
                 print(f"{'='*60}")
                 print(text)
-                print(f"{'='*60}
-")
+                print(f"{'='*60}")
                 return True
             
             elif self.mode == 'pywhatkit':

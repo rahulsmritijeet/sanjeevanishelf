@@ -46,8 +46,7 @@ class WeightHandler:
             return True
         
         try:
-            self.serial.write(b"TARE
-")
+            self.serial.write(b"TARE")
             
             start = time.time()
             while time.time() - start < self.timeout:

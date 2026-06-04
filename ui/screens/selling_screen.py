@@ -31,8 +31,8 @@ class SellingScreen(Screen):
         self.app = app_instance
         self.name = 'selling'
         
-        self.inventory = InventoryManager(app_instance.config)
-        self.billing = BillingEngine(app_instance.config)
+        self.inventory = InventoryManager(app_instance.app_config)
+        self.billing = BillingEngine(app_instance.app_config)
         self.payment_sim = PaymentSimulator()
         
         self.session = None
@@ -300,7 +300,7 @@ class SellingScreen(Screen):
             'SELLING_CONFIRMATION',
             self.app.current_language,
             {
-                'godown_name': self.app.config.get('godown_name', 'Godown'),
+                'godown_name': self.app.app_config.get('godown_name', 'Godown'),
                 'farmer_name': self.farmer['name'],
                 'batch_code': self.batch['batch_code'],
                 'crop_type': self.batch['crop_type'],

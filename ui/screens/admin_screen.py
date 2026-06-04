@@ -28,8 +28,8 @@ class AdminScreen(Screen):
         self.app = app_instance
         self.name = 'admin'
         
-        self.inventory = InventoryManager(app_instance.config)
-        self.expiry_mgr = ExpiryManager(app_instance.config)
+        self.inventory = InventoryManager(app_instance.app_config)
+        self.expiry_mgr = ExpiryManager(app_instance.app_config)
         
         self._build_ui()
     
@@ -291,13 +291,9 @@ class AdminScreen(Screen):
         """Run expiry check and confiscation."""
         result = self.expiry_mgr.daily_expiry_check(self.app.current_language)
         
-        message = f"Expiry Check Complete:
-
-"
-        message += f"Warnings Sent: {result['warnings_sent']}
-"
-        message += f"Batches Confiscated: {result['confiscated']}
-"
+        message = f"Expiry Check Complete:"
+        message += f"Warnings Sent: {result['warnings_sent']}"
+        message += f"Batches Confiscated: {result['confiscated']}"
         
         self._show_info("Expiry Check", message)
         
@@ -356,14 +352,14 @@ class AdminScreen(Screen):
         info = GridLayout(cols=2, spacing=10, size_hint_y=0.5)
         
         info.add_widget(Label(text='Godown ID:', font_size='18sp', bold=True))
-        info.add_widget(Label(text=self.app.config.get('godown_id', 'N/A'), font_size='18sp'))
+        info.add_widget(Label(text=self.app.app_config.get('godown_id', 'N/A'), font_size='18sp'))
         
         info.add_widget(Label(text='Simulation Mode:', font_size='18sp', bold=True))
-        sim_mode = 'YES' if self.app.config.get('simulation_mode') else 'NO'
+        sim_mode = 'YES' if self.app.app_config.get('simulation_mode') else 'NO'
         info.add_widget(Label(text=sim_mode, font_size='18sp', color=(1, 0, 0, 1) if sim_mode == 'YES' else (0, 1, 0, 1)))
         
         info.add_widget(Label(text='Total Capacity:', font_size='18sp', bold=True))
-        info.add_widget(Label(text=f"{self.app.config['capacity']['total']} kg", font_size='18sp'))
+        info.add_widget(Label(text=f"{self.app.app_config['capacity']['total']} kg", font_size='18sp'))
         
         info.add_widget(Label(text='Current Stock:', font_size='18sp', bold=True))
         info.add_widget(Label(text=f"{self.inventory.get_total_stock():.2f} kg", font_size='18sp'))

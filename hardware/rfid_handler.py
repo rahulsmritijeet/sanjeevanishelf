@@ -76,8 +76,7 @@ class RFIDHandler:
             return True
         
         try:
-            command = f"WRITE:{uid}:{data}
-"
+            command = f"WRITE:{uid}:{data}"
             self.serial.write(command.encode('utf-8'))
             
             # Wait for ACK

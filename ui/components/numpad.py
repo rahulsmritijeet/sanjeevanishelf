@@ -3,6 +3,7 @@ Numeric Keypad Component
 On-screen numpad for touch input.
 """
 
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.button import Button
 from kivy.uix.textinput import TextInput
@@ -12,19 +13,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class NumPad(GridLayout):
+class NumPad(BoxLayout):
     """On-screen numeric keypad."""
     
     value = StringProperty('')
     on_submit = ObjectProperty(None)
     
-    def __init__(self, max_length=10, allow_decimal=False, **kwargs):
+    def __init__(self, max_length=10, allow_decimal=False, on_submit_callback=None, **kwargs):
         super().__init__(**kwargs)
-        self.cols = 3
-        self.spacing = 5
+        self.orientation = 'vertical'
         self.padding = 10
+        self.spacing = 10
+        self.size_hint = (1, 1)
+        
         self.max_length = max_length
         self.allow_decimal = allow_decimal
+        self.on_submit = on_submit_callback
         
         # Display
         self.display = TextInput(
@@ -34,94 +38,87 @@ class NumPad(GridLayout):
             font_size='32sp',
             size_hint_y=None,
             height=80,
-            halign='right'
+            halign='right',
+            padding=(10, 10)
         )
-        
-        # Create layout
-        self._build_ui()
-    
-    def _build_ui(self):
-        """Build numpad UI."""
-        # Add display at top (spanning all columns)
         self.add_widget(self.display)
-        self.add_widget(Button(size_hint_y=None, height=0))  # Spacer
-        self.add_widget(Button(size_hint_y=None, height=0))  # Spacer
         
-        # Number buttons
+        # Create keypad
+        self._build_keypad()
+    
+    def _build_keypad(self):
+        """Build numpad UI."""
+        # Keypad grid
+        keypad = GridLayout(cols=3, spacing=5, padding=5, size_hint_y=0.9)
+        
+        # Number buttons (7-9, 4-6, 1-3)
         buttons = [
-            '7', '8', '9',
-            '4', '5', '6',
-            '1', '2', '3',
+            ['7', '8', '9'],
+            ['4', '5', '6'],
+            ['1', '2', '3'],
         ]
         
-        for num in buttons:
-            btn = Button(
-                text=num,
-                font_size='28sp',
-                bold=True,
-                size_hint_y=None,
-                height=80
-            )
-            btn.bind(on_press=lambda x, n=num: self._on_number_press(n))
-            self.add_widget(btn)
+        for row in buttons:
+            for num in row:
+                btn = Button(
+                    text=num,
+                    font_size='28sp',
+                    bold=True,
+                    background_color=(0.3, 0.3, 0.3, 1)
+                )
+                btn.bind(on_press=lambda x, n=num: self._on_number_press(n))
+                keypad.add_widget(btn)
         
-        # Bottom row: Clear, 0, Backspace
+        # Bottom row (C, 0, Decimal/Backspace)
         btn_clear = Button(
             text='C',
             font_size='28sp',
             bold=True,
-            background_color=(0.8, 0.2, 0.2, 1),
-            size_hint_y=None,
-            height=80
+            background_color=(0.8, 0.2, 0.2, 1)
         )
         btn_clear.bind(on_press=self._on_clear)
-        self.add_widget(btn_clear)
+        keypad.add_widget(btn_clear)
         
         btn_zero = Button(
             text='0',
             font_size='28sp',
             bold=True,
-            size_hint_y=None,
-            height=80
+            background_color=(0.3, 0.3, 0.3, 1)
         )
         btn_zero.bind(on_press=lambda x: self._on_number_press('0'))
-        self.add_widget(btn_zero)
+        keypad.add_widget(btn_zero)
         
         if self.allow_decimal:
             btn_decimal = Button(
                 text='.',
                 font_size='28sp',
                 bold=True,
-                size_hint_y=None,
-                height=80
+                background_color=(0.3, 0.3, 0.3, 1)
             )
             btn_decimal.bind(on_press=lambda x: self._on_number_press('.'))
-            self.add_widget(btn_decimal)
+            keypad.add_widget(btn_decimal)
         else:
             btn_backspace = Button(
                 text='⌫',
                 font_size='28sp',
                 bold=True,
-                background_color=(0.6, 0.6, 0.2, 1),
-                size_hint_y=None,
-                height=80
+                background_color=(0.6, 0.6, 0.2, 1)
             )
             btn_backspace.bind(on_press=self._on_backspace)
-            self.add_widget(btn_backspace)
+            keypad.add_widget(btn_backspace)
         
-        # Enter button (spanning bottom)
+        self.add_widget(keypad)
+        
+        # Enter button
         btn_enter = Button(
             text='ENTER',
-            font_size='28sp',
+            font_size='24sp',
             bold=True,
             background_color=(0.2, 0.6, 0.2, 1),
-            size_hint_y=None,
-            height=80
+            size_hint_y=0.1
         )
         btn_enter.bind(on_press=self._on_submit)
         self.add_widget(btn_enter)
-        self.add_widget(Button(size_hint_y=None, height=0))  # Spacer
-        self.add_widget(Button(size_hint_y=None, height=0))  # Spacer
     
     def _on_number_press(self, number):
         """Handle number button press."""
@@ -145,8 +142,9 @@ class NumPad(GridLayout):
     
     def _on_backspace(self, *args):
         """Remove last character."""
-        self.display.text = self.display.text[:-1]
-        self.value = self.display.text
+        if len(self.display.text) > 0:
+            self.display.text = self.display.text[:-1]
+            self.value = self.display.text
     
     def _on_submit(self, *args):
         """Submit value."""

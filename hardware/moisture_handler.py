@@ -49,8 +49,7 @@ class MoistureHandler:
             return self._simulate_read()
         
         try:
-            self.serial.write(b"READ
-")
+            self.serial.write(b"READ")
             
             start = time.time()
             while time.time() - start < self.timeout:
