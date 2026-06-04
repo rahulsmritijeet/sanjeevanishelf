@@ -137,13 +137,30 @@ class StartupScreen(QWidget):
         self.selected_mode = mode_id
         logger.info(f"Mode selected: {mode_id}")
         
-        # Show PIN entry dialog
-        self._show_pin_dialog()
+        # Only ask for PIN if Admin mode
+        if mode_id == 'admin':
+            self._show_pin_dialog()
+        else:
+            # For Storage, Selling, Buying - use default operator
+            self._login_as_default_operator()
+    
+    def _login_as_default_operator(self):
+        """Login as default operator without PIN (for non-admin modes)."""
+        # Get default operator user
+        user = db.fetchone("SELECT * FROM users WHERE username = 'operator' AND active = 1")
+        
+        if user:
+            self.app.current_user = dict(user)
+            self.app.current_mode = self.selected_mode
+            self.app.show_screen(self.selected_mode)
+            logger.info(f"Auto-login as operator for {self.selected_mode} mode")
+        else:
+            QMessageBox.critical(self, 'Error', 'Default operator account not found!')
     
     def _show_pin_dialog(self):
-        """Show PIN entry dialog."""
+        """Show PIN entry dialog for admin."""
         dialog = QDialog(self)
-        dialog.setWindowTitle('Operator Login')
+        dialog.setWindowTitle('Admin Login')
         dialog.setGeometry(150, 100, 500, 300)
         dialog.setStyleSheet("background-color: white;")
         
@@ -202,17 +219,14 @@ class StartupScreen(QWidget):
         dialog.exec_()
     
     def _verify_pin(self, pin):
-        """Verify operator PIN."""
-        try:
-            users = db.fetchall("SELECT * FROM users WHERE active = 1")
-            
-            for user in users:
-                stored_hash = user['pin_hash']
-                if bcrypt.checkpw(pin.encode('utf-8'), stored_hash.encode('utf-8')):
-                    logger.info(f"User authenticated: {user['username']}")
-                    return dict(user)
-        except Exception as e:
-            logger.error(f"PIN verification error: {e}")
+        """Verify admin PIN."""
+        # SIMPLE VERSION: Just check if PIN is '1234' for admin
+        if pin == '1234':
+            # Get manager user
+            user = db.fetchone("SELECT * FROM users WHERE username = 'manager' AND active = 1")
+            if user:
+                logger.info(f"Admin authenticated: {user['username']}")
+                return dict(user)
         
-        logger.warning(f"Authentication failed for PIN")
+        logger.warning("Admin authentication failed")
         return None

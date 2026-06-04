@@ -1,15 +1,15 @@
 """
-Buying Flow Screen
+Buying Flow Screen - PyQt5
 Godown purchases crop directly from farmer.
 """
 
-from kivy.uix.screenmanager import Screen
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.progressbar import ProgressBar
-from kivy.uix.popup import Popup
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QLineEdit, QComboBox, QGridLayout, QDialog, QMessageBox,
+    QProgressBar
+)
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt, QTimer
 from datetime import datetime, date
 import logging
 from core.inventory import InventoryManager
@@ -25,17 +25,16 @@ from database.db_manager import db
 logger = logging.getLogger(__name__)
 
 
-class BuyingScreen(Screen):
+class BuyingScreen(QWidget):
     """Buying flow screen."""
     
-    def __init__(self, app_instance, **kwargs):
-        super().__init__(**kwargs)
-        self.app = app_instance
-        self.name = 'buying'
+    def __init__(self, app):
+        super().__init__()
+        self.app = app
         
-        self.inventory = InventoryManager(app_instance.app_config)
+        self.inventory = InventoryManager(app.app_config)
         self.quality = QualityControl()
-        self.billing = BillingEngine(app_instance.app_config)
+        self.billing = BillingEngine(app.app_config)
         self.payment_sim = PaymentSimulator()
         
         self.session = None
@@ -46,83 +45,78 @@ class BuyingScreen(Screen):
     
     def _build_ui(self):
         """Build buying UI."""
-        layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
         
         # Header
-        header = BoxLayout(size_hint_y=0.1, spacing=10)
+        header_layout = QHBoxLayout()
         
-        self.title_label = Label(
-            text='[b]BUYING FLOW[/b]',
-            markup=True,
-            font_size='28sp'
-        )
-        header.add_widget(self.title_label)
+        self.title_label = QLabel('BUYING FLOW')
+        title_font = QFont()
+        title_font.setPointSize(20)
+        title_font.setBold(True)
+        self.title_label.setFont(title_font)
+        header_layout.addWidget(self.title_label, stretch=1)
         
-        btn_back = Button(
-            text='← Back',
-            font_size='20sp',
-            size_hint_x=0.2,
-            background_color=(0.8, 0.2, 0.2, 1)
-        )
-        btn_back.bind(on_press=self._on_back)
-        header.add_widget(btn_back)
+        btn_back = QPushButton('← Back')
+        btn_back.setFont(QFont('Arial', 12))
+        btn_back.setFixedWidth(100)
+        btn_back.setStyleSheet("background-color: #CC3333; color: white;")
+        btn_back.clicked.connect(self._on_back)
+        header_layout.addWidget(btn_back)
         
-        layout.add_widget(header)
+        layout.addLayout(header_layout)
         
-        # Progress
-        self.progress = ProgressBar(max=100, size_hint_y=0.05)
-        layout.add_widget(self.progress)
+        # Progress bar
+        self.progress = QProgressBar()
+        self.progress.setMaximum(100)
+        self.progress.setValue(0)
+        layout.addWidget(self.progress)
         
-        # Content
-        self.content_area = BoxLayout(orientation='vertical', size_hint_y=0.7, padding=20, spacing=15)
-        layout.add_widget(self.content_area)
+        # Content area
+        self.content_area = QVBoxLayout()
+        layout.addLayout(self.content_area, stretch=1)
         
-        # Controls
-        self.control_buttons = BoxLayout(size_hint_y=0.15, spacing=10)
-        layout.add_widget(self.control_buttons)
+        # Control buttons
+        self.control_buttons = QHBoxLayout()
+        layout.addLayout(self.control_buttons)
         
-        self.add_widget(layout)
+        self.setLayout(layout)
+        
+        # Show farmer lookup
+        self.show_farmer_lookup()
     
-    def on_enter(self):
-        """Initialize screen."""
-        user_id = self.app.current_user['id']
-        self.session = SessionManager(operator_id=user_id, mode='buying')
-        
-        self._show_farmer_lookup()
-    
-    def _show_farmer_lookup(self):
+    def show_farmer_lookup(self):
         """Step 1: Farmer lookup."""
-        self.content_area.clear_widgets()
-        self.control_buttons.clear_widgets()
+        self._clear_content()
         
-        self.title_label.text = '[b]Step 1: Farmer Lookup[/b]'
-        self.progress.value = 10
+        self.title_label.setText('Step 1: Farmer Lookup')
+        self.progress.setValue(10)
         
-        from ui.components.numpad import NumPad
+        label = QLabel('Enter Farmer Phone Number (10 digits):')
+        label.setFont(QFont('Arial', 14))
+        self.content_area.addWidget(label)
         
-        label = Label(
-            text='Enter Farmer Phone Number:',
-            font_size='24sp',
-            size_hint_y=0.2
-        )
-        self.content_area.add_widget(label)
+        self.phone_input = QLineEdit()
+        self.phone_input.setFont(QFont('Arial', 16))
+        self.phone_input.setFixedHeight(50)
+        self.phone_input.setMaxLength(10)
+        self.content_area.addWidget(self.phone_input)
         
-        self.phone_numpad = NumPad(max_length=10, allow_decimal=False)
-        self.phone_numpad.on_submit = self._on_phone_submitted
-        self.content_area.add_widget(self.phone_numpad)
-        
-        btn_submit = Button(
-            text='Search Farmer',
-            font_size='22sp',
-            background_color=(0.2, 0.6, 0.2, 1)
-        )
-        btn_submit.bind(on_press=lambda x: self._on_phone_submitted(self.phone_numpad.get_value()))
-        self.control_buttons.add_widget(btn_submit)
+        btn_submit = QPushButton('Search Farmer')
+        btn_submit.setFont(QFont('Arial', 12))
+        btn_submit.setFixedHeight(50)
+        btn_submit.setStyleSheet("background-color: #33CC33; color: white;")
+        btn_submit.clicked.connect(self._on_phone_submitted)
+        self.control_buttons.addWidget(btn_submit)
     
-    def _on_phone_submitted(self, phone):
+    def _on_phone_submitted(self):
         """Handle phone submission."""
+        phone = self.phone_input.text()
+        
         if len(phone) != 10:
-            self._show_error("Please enter 10-digit phone number")
+            QMessageBox.warning(self, 'Error', 'Please enter 10-digit phone number')
             return
         
         farmer = db.get_farmer_by_phone(phone)
@@ -130,212 +124,187 @@ class BuyingScreen(Screen):
         if farmer:
             self.farmer = farmer
             self.flow_data['farmer_id'] = farmer['id']
+            user_id = self.app.current_user['id']
+            self.session = SessionManager(operator_id=user_id, mode='buying')
             self.session.start(farmer_id=farmer['id'])
-            self._show_crop_selection()
+            self.show_crop_selection()
         else:
             self._show_farmer_registration(phone)
     
     def _show_farmer_registration(self, phone):
         """Show farmer registration form."""
-        # Similar to storage screen registration
-        content = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Register New Farmer')
+        dialog.setGeometry(100, 100, 400, 300)
         
-        content.add_widget(Label(
-            text='Farmer not found. Register new farmer:',
-            font_size='20sp',
-            size_hint_y=0.15
-        ))
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel('Register New Farmer'))
         
-        from kivy.uix.textinput import TextInput
-        form = GridLayout(cols=2, spacing=10, size_hint_y=0.6)
+        form = QGridLayout()
+        form.addWidget(QLabel('Phone:'), 0, 0)
+        phone_field = QLineEdit(phone)
+        phone_field.setReadOnly(True)
+        form.addWidget(phone_field, 0, 1)
         
-        form.add_widget(Label(text='Phone:', font_size='18sp'))
-        phone_input = TextInput(text=phone, readonly=True, font_size='18sp')
-        form.add_widget(phone_input)
+        form.addWidget(QLabel('Name:'), 1, 0)
+        name_field = QLineEdit()
+        form.addWidget(name_field, 1, 1)
         
-        form.add_widget(Label(text='Name:', font_size='18sp'))
-        name_input = TextInput(multiline=False, font_size='18sp')
-        form.add_widget(name_input)
+        form.addWidget(QLabel('Village:'), 2, 0)
+        village_field = QLineEdit()
+        form.addWidget(village_field, 2, 1)
         
-        form.add_widget(Label(text='Village:', font_size='18sp'))
-        village_input = TextInput(multiline=False, font_size='18sp')
-        form.add_widget(village_input)
+        layout.addLayout(form)
         
-        content.add_widget(form)
+        btn_layout = QHBoxLayout()
         
-        btn_layout = BoxLayout(size_hint_y=0.25, spacing=10)
-        
-        popup = Popup(
-            title='Register Farmer',
-            content=content,
-            size_hint=(0.7, 0.6),
-            auto_dismiss=False
-        )
-        
-        def on_register(*args):
-            name = name_input.text.strip()
+        def on_register():
+            name = name_field.text().strip()
             if not name:
+                QMessageBox.warning(dialog, 'Error', 'Name is required')
                 return
             
             farmer_id = db.insert('farmers', {
                 'phone': phone,
                 'name': name,
-                'village': village_input.text.strip()
+                'village': village_field.text().strip()
             })
             
             self.farmer = db.get_farmer_by_phone(phone)
             self.flow_data['farmer_id'] = farmer_id
+            user_id = self.app.current_user['id']
+            self.session = SessionManager(operator_id=user_id, mode='buying')
             self.session.start(farmer_id=farmer_id)
             
-            popup.dismiss()
-            self._show_crop_selection()
+            dialog.accept()
+            self.show_crop_selection()
         
-        btn_register = Button(text='Register', font_size='20sp', background_color=(0.2, 0.6, 0.2, 1))
-        btn_register.bind(on_press=on_register)
-        btn_layout.add_widget(btn_register)
+        btn_register = QPushButton('Register')
+        btn_register.setStyleSheet("background-color: #33CC33; color: white;")
+        btn_register.clicked.connect(on_register)
+        btn_layout.addWidget(btn_register)
         
-        btn_cancel = Button(text='Cancel', font_size='20sp')
-        btn_cancel.bind(on_press=popup.dismiss)
-        btn_layout.add_widget(btn_cancel)
+        btn_cancel = QPushButton('Cancel')
+        btn_cancel.clicked.connect(dialog.reject)
+        btn_layout.addWidget(btn_cancel)
         
-        content.add_widget(btn_layout)
-        popup.open()
+        layout.addLayout(btn_layout)
+        dialog.setLayout(layout)
+        dialog.exec_()
     
-    def _show_crop_selection(self):
+    def show_crop_selection(self):
         """Step 2: Crop selection."""
-        self.content_area.clear_widgets()
-        self.control_buttons.clear_widgets()
+        self._clear_content()
         
-        self.title_label.text = '[b]Step 2: Select Crop Type[/b]'
-        self.progress.value = 25
+        self.title_label.setText('Step 2: Select Crop Type')
+        self.progress.setValue(25)
         
-        label = Label(
-            text='Select Crop Type:',
-            font_size='24sp',
-            size_hint_y=0.2
-        )
-        self.content_area.add_widget(label)
+        label = QLabel('Select Crop Type:')
+        label.setFont(QFont('Arial', 14))
+        self.content_area.addWidget(label)
         
         crops = ['rice', 'wheat', 'maize', 'pulses']
-        crop_buttons = GridLayout(cols=2, spacing=20, padding=20, size_hint_y=0.8)
+        crop_grid = QGridLayout()
         
-        for crop in crops:
-            btn = Button(
-                text=crop.upper(),
-                font_size='28sp',
-                bold=True,
-                background_color=(0.2, 0.6, 0.8, 1)
-            )
-            btn.crop_type = crop
-            btn.bind(on_press=self._on_crop_selected)
-            crop_buttons.add_widget(btn)
+        for i, crop in enumerate(crops):
+            btn = QPushButton(crop.upper())
+            btn.setFont(QFont('Arial', 12, QFont.Bold))
+            btn.setFixedHeight(80)
+            btn.setStyleSheet("background-color: #3366FF; color: white;")
+            btn.clicked.connect(lambda checked, c=crop: self._on_crop_selected(c))
+            crop_grid.addWidget(btn, i // 2, i % 2)
         
-        self.content_area.add_widget(crop_buttons)
+        self.content_area.addLayout(crop_grid, stretch=1)
     
-    def _on_crop_selected(self, button):
+    def _on_crop_selected(self, crop_type):
         """Handle crop selection."""
-        self.flow_data['crop_type'] = button.crop_type
-        self._show_weight_measurement()
+        self.flow_data['crop_type'] = crop_type
+        self.show_weight_measurement()
     
-    def _show_weight_measurement(self):
-        """Step 3: Weight measurement (same as storage)."""
-        self.content_area.clear_widgets()
-        self.control_buttons.clear_widgets()
+    def show_weight_measurement(self):
+        """Step 3: Weight measurement."""
+        self._clear_content()
         
-        self.title_label.text = '[b]Step 3: Weight Measurement[/b]'
-        self.progress.value = 40
+        self.title_label.setText('Step 3: Weight Measurement')
+        self.progress.setValue(40)
         
-        info = BoxLayout(orientation='vertical', spacing=10)
+        info = QVBoxLayout()
         
-        info.add_widget(Label(
-            text='Place crop on the scale',
-            font_size='24sp',
-            size_hint_y=0.3
-        ))
+        label = QLabel('Place crop on the scale')
+        label.setFont(QFont('Arial', 14))
+        info.addWidget(label)
         
-        self.weight_label = Label(
-            text='Weight: --- kg',
-            font_size='32sp',
-            bold=True,
-            color=(0, 1, 0, 1),
-            size_hint_y=0.4
-        )
-        info.add_widget(self.weight_label)
+        self.weight_label = QLabel('Weight: --- kg')
+        weight_font = QFont()
+        weight_font.setPointSize(24)
+        weight_font.setBold(True)
+        self.weight_label.setFont(weight_font)
+        self.weight_label.setStyleSheet("color: green;")
+        info.addWidget(self.weight_label, stretch=1)
         
-        self.content_area.add_widget(info)
+        self.content_area.addLayout(info, stretch=1)
         
-        btn_tare = Button(
-            text='Tare Scale',
-            font_size='22sp',
-            background_color=(0.6, 0.6, 0.2, 1)
-        )
-        btn_tare.bind(on_press=self._on_tare_scale)
-        self.control_buttons.add_widget(btn_tare)
+        btn_tare = QPushButton('Tare Scale')
+        btn_tare.setFixedHeight(50)
+        btn_tare.setStyleSheet("background-color: #FFAA00; color: white;")
+        btn_tare.clicked.connect(self._on_tare_scale)
+        self.control_buttons.addWidget(btn_tare)
         
-        btn_read = Button(
-            text='Read Weight',
-            font_size='22sp',
-            background_color=(0.2, 0.6, 0.2, 1)
-        )
-        btn_read.bind(on_press=self._on_read_weight)
-        self.control_buttons.add_widget(btn_read)
+        btn_read = QPushButton('Read Weight')
+        btn_read.setFixedHeight(50)
+        btn_read.setStyleSheet("background-color: #33CC33; color: white;")
+        btn_read.clicked.connect(self._on_read_weight)
+        self.control_buttons.addWidget(btn_read)
     
-    def _on_tare_scale(self, *args):
+    def _on_tare_scale(self):
         """Tare scale."""
         hw = get_hardware()
         hw.weight.tare()
-        self.weight_label.text = 'Weight: 0.00 kg (Tared)'
+        self.weight_label.setText('Weight: 0.00 kg (Tared)')
     
-    def _on_read_weight(self, *args):
+    def _on_read_weight(self):
         """Read weight."""
         hw = get_hardware()
         weight = hw.weight.read_weight()
         
         if weight and weight > 0:
             self.flow_data['weight_kg'] = weight
-            self.weight_label.text = f'Weight: {weight:.2f} kg'
+            self.weight_label.setText(f'Weight: {weight:.2f} kg')
             
-            from kivy.clock import Clock
-            Clock.schedule_once(lambda dt: self._show_moisture_measurement(), 2)
+            QTimer.singleShot(2000, self.show_moisture_measurement)
         else:
-            self._show_error("Invalid weight")
+            QMessageBox.warning(self, 'Error', 'Invalid weight')
     
-    def _show_moisture_measurement(self):
+    def show_moisture_measurement(self):
         """Step 4: Moisture measurement."""
-        self.content_area.clear_widgets()
-        self.control_buttons.clear_widgets()
+        self._clear_content()
         
-        self.title_label.text = '[b]Step 4: Moisture Measurement[/b]'
-        self.progress.value = 55
+        self.title_label.setText('Step 4: Moisture Measurement')
+        self.progress.setValue(55)
         
-        info = BoxLayout(orientation='vertical', spacing=10)
+        info = QVBoxLayout()
         
-        info.add_widget(Label(
-            text='Insert moisture probe',
-            font_size='24sp',
-            size_hint_y=0.3
-        ))
+        label = QLabel('Insert moisture probe')
+        label.setFont(QFont('Arial', 14))
+        info.addWidget(label)
         
-        self.moisture_label = Label(
-            text='Moisture: ---%',
-            font_size='32sp',
-            bold=True,
-            color=(0, 1, 0, 1),
-            size_hint_y=0.4
-        )
-        info.add_widget(self.moisture_label)
+        self.moisture_label = QLabel('Moisture: ---%')
+        moisture_font = QFont()
+        moisture_font.setPointSize(24)
+        moisture_font.setBold(True)
+        self.moisture_label.setFont(moisture_font)
+        self.moisture_label.setStyleSheet("color: green;")
+        info.addWidget(self.moisture_label, stretch=1)
         
-        self.content_area.add_widget(info)
+        self.content_area.addLayout(info, stretch=1)
         
-        btn_read = Button(
-            text='Read Moisture',
-            font_size='22sp',
-            background_color=(0.2, 0.6, 0.2, 1)
-        )
-        btn_read.bind(on_press=self._on_read_moisture)
-        self.control_buttons.add_widget(btn_read)
+        btn_read = QPushButton('Read Moisture')
+        btn_read.setFixedHeight(50)
+        btn_read.setStyleSheet("background-color: #33CC33; color: white;")
+        btn_read.clicked.connect(self._on_read_moisture)
+        self.control_buttons.addWidget(btn_read)
     
-    def _on_read_moisture(self, *args):
+    def _on_read_moisture(self):
         """Read moisture."""
         hw = get_hardware()
         readings = hw.moisture.read_moisture()
@@ -343,12 +312,11 @@ class BuyingScreen(Screen):
         if readings:
             avg_moisture = readings[-1]
             self.flow_data['moisture_percent'] = avg_moisture
-            self.moisture_label.text = f'Moisture: {avg_moisture:.2f}%'
+            self.moisture_label.setText(f'Moisture: {avg_moisture:.2f}%')
             
-            from kivy.clock import Clock
-            Clock.schedule_once(lambda dt: self._validate_and_calculate(), 2)
+            QTimer.singleShot(2000, self._validate_and_calculate)
         else:
-            self._show_error("Failed to read moisture")
+            QMessageBox.warning(self, 'Error', 'Failed to read moisture')
     
     def _validate_and_calculate(self):
         """Step 5: Quality check and payment calculation."""
@@ -360,7 +328,7 @@ class BuyingScreen(Screen):
         accepted, grade, message = self.quality.validate_moisture(crop_type, moisture)
         
         if not accepted:
-            self._show_error(f"Quality Rejected: {message}")
+            QMessageBox.critical(self, 'Quality Rejected', f"Quality Rejected: {message}")
             return
         
         self.flow_data['quality_grade'] = grade
@@ -368,7 +336,7 @@ class BuyingScreen(Screen):
         # Capacity check
         capacity_ok, capacity_msg = self.inventory.check_capacity(crop_type, weight_kg)
         if not capacity_ok:
-            self._show_error(capacity_msg)
+            QMessageBox.critical(self, 'Error', capacity_msg)
             return
         
         # Calculate payment
@@ -379,65 +347,62 @@ class BuyingScreen(Screen):
         self.flow_data['amount'] = amount
         self.flow_data['billing_breakdown'] = breakdown
         
-        # Show summary
-        self._show_summary()
+        self.show_summary()
     
-    def _show_summary(self):
+    def show_summary(self):
         """Show purchase summary."""
-        self.content_area.clear_widgets()
-        self.control_buttons.clear_widgets()
+        self._clear_content()
         
-        self.title_label.text = '[b]Purchase Summary[/b]'
-        self.progress.value = 75
+        self.title_label.setText('Purchase Summary')
+        self.progress.setValue(75)
         
-        summary = BoxLayout(orientation='vertical', spacing=5, padding=10)
+        summary = QVBoxLayout()
         
         data = self.flow_data
         
-        summary.add_widget(Label(text='[b]Purchase Details[/b]', markup=True, font_size='24sp', size_hint_y=0.1))
-        summary.add_widget(Label(text=f"Farmer: {self.farmer['name']}", font_size='18sp', size_hint_y=0.08))
-        summary.add_widget(Label(text=f"Crop: {data['crop_type'].upper()}", font_size='18sp', size_hint_y=0.08))
-        summary.add_widget(Label(text=f"Weight: {data['weight_kg']:.2f} kg", font_size='18sp', size_hint_y=0.08))
-        summary.add_widget(Label(text=f"Quality: Grade {data['quality_grade']}", font_size='18sp', size_hint_y=0.08))
-        summary.add_widget(Label(text=f"Rate: ₹{data['billing_breakdown']['applied_rate']}/kg", font_size='18sp', size_hint_y=0.08))
+        summary.addWidget(QLabel('[Purchase Details]'))
+        summary.addWidget(QLabel(f"Farmer: {self.farmer['name']}"))
+        summary.addWidget(QLabel(f"Crop: {data['crop_type'].upper()}"))
+        summary.addWidget(QLabel(f"Weight: {data['weight_kg']:.2f} kg"))
+        summary.addWidget(QLabel(f"Quality: Grade {data['quality_grade']}"))
+        summary.addWidget(QLabel(f"Rate: ₹{data['billing_breakdown']['applied_rate']:.2f}/kg"))
         
-        summary.add_widget(Label(text='', size_hint_y=0.05))
+        summary.addSpacing(20)
         
-        summary.add_widget(Label(
-            text=f"[b]Amount to Pay Farmer: ₹{data['amount']:.2f}[/b]",
-            markup=True,
-            font_size='28sp',
-            color=(0, 1, 0, 1),
-            size_hint_y=0.15
-        ))
+        amount_label = QLabel(f"Amount to Pay Farmer: ₹{data['amount']:.2f}")
+        amount_font = QFont()
+        amount_font.setPointSize(18)
+        amount_font.setBold(True)
+        amount_label.setFont(amount_font)
+        amount_label.setStyleSheet("color: green;")
+        summary.addWidget(amount_label)
         
-        self.content_area.add_widget(summary)
+        self.content_area.addLayout(summary, stretch=1)
         
-        btn_payment = Button(
-            text='Proceed to Payment',
-            font_size='24sp',
-            bold=True,
-            background_color=(0.2, 0.6, 0.2, 1)
-        )
-        btn_payment.bind(on_press=self._show_payment)
-        self.control_buttons.add_widget(btn_payment)
+        btn_payment = QPushButton('Proceed to Payment')
+        btn_payment.setFixedHeight(60)
+        btn_payment.setFont(QFont('Arial', 14, QFont.Bold))
+        btn_payment.setStyleSheet("background-color: #33CC33; color: white;")
+        btn_payment.clicked.connect(self._show_payment)
+        self.control_buttons.addWidget(btn_payment)
     
-    def _show_payment(self, *args):
+    def _show_payment(self):
         """Show payment screen."""
-        payment_screen = self.manager.get_screen('payment')
-        payment_screen.setup_payment(
+        self.app.show_screen('payment')
+        self.app.screens['payment'].setup_payment(
             amount=self.flow_data['amount'],
             transaction_type='buying',
-            on_payment_complete=self._on_payment_complete
+            flow_data=self.flow_data,
+            farmer=self.farmer,
+            session=self.session,
+            on_complete=self._on_payment_complete
         )
-        self.manager.current = 'payment'
     
     def _on_payment_complete(self, payment_ref):
         """Handle payment completion."""
         # Create batch and store crop
         batch_code = f"BUY-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        # Allocate stack and RFID
         stack_location = self.inventory.allocate_stack(
             self.flow_data['crop_type'],
             self.flow_data['weight_kg']
@@ -498,10 +463,10 @@ class BuyingScreen(Screen):
         hw = get_hardware()
         hw.rfid.write_data(rfid_uid, batch_code)
         
-        # Send WhatsApp (buying confirmation - custom template or reuse storage)
+        # Send WhatsApp
         whatsapp = get_whatsapp()
         message = WhatsAppTemplates.format_message(
-            'STORAGE_CONFIRMATION',  # Reuse storage template
+            'STORAGE_CONFIRMATION',
             self.app.current_language,
             {
                 'godown_name': self.app.app_config.get('godown_name', 'Godown'),
@@ -530,56 +495,36 @@ class BuyingScreen(Screen):
         # Commit session
         self.session.commit()
         
-        # Show receipt
-        self._show_receipt(txn_id)
+        # Show success
+        self.progress.setValue(100)
+        QMessageBox.information(self, 'Success', 
+            f'Purchase completed successfully!\n\n'
+            f'Amount Paid: ₹{self.flow_data["amount"]:.2f}\n'
+            f'Batch Code: {batch_code}\n'
+            f'WhatsApp notification sent to farmer.')
+        
+        self.app.show_screen('startup')
     
-    def _show_receipt(self, txn_id):
-        """Show receipt."""
-        self.progress.value = 100
+    def _clear_content(self):
+        """Clear content area."""
+        while self.content_area.count():
+            widget = self.content_area.takeAt(0).widget()
+            if widget:
+                widget.deleteLater()
+            else:
+                layout = self.content_area.takeAt(0)
+                while layout and layout.count():
+                    item = layout.takeAt(0)
+                    if item.widget():
+                        item.widget().deleteLater()
         
-        receipt_data = self.payment_sim.generate_receipt(txn_id, self.app.current_language)
-        
-        from ui.components.receipt_viewer import ReceiptViewer
-        
-        receipt_viewer = ReceiptViewer()
-        receipt_viewer.show_receipt(receipt_data)
-        
-        popup = Popup(
-            title='Buying Receipt',
-            content=receipt_viewer,
-            size_hint=(0.9, 0.9)
-        )
-        
-        original_close = receipt_viewer._on_close
-        
-        def new_close(*args):
-            popup.dismiss()
-            self.manager.current = 'startup'
-        
-        receipt_viewer._on_close = new_close
-        
-        popup.open()
+        while self.control_buttons.count():
+            widget = self.control_buttons.takeAt(0).widget()
+            if widget:
+                widget.deleteLater()
     
-    def _show_error(self, message):
-        """Show error."""
-        content = BoxLayout(orientation='vertical', padding=20, spacing=10)
-        content.add_widget(Label(text=message, font_size='20sp'))
-        
-        popup = Popup(
-            title='Error',
-            content=content,
-            size_hint=(0.6, 0.3)
-        )
-        
-        btn_ok = Button(text='OK', font_size='20sp', size_hint_y=0.3)
-        btn_ok.bind(on_press=popup.dismiss)
-        content.add_widget(btn_ok)
-        
-        popup.open()
-        logger.error(message)
-    
-    def _on_back(self, *args):
+    def _on_back(self):
         """Go back."""
         if self.session:
             self.session.rollback()
-        self.manager.current = 'startup' 
+        self.app.show_screen('startup')

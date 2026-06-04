@@ -1,14 +1,15 @@
 """
-Selling Flow Screen
+Selling Flow Screen - PyQt5
 Farmer sells stored crop back to godown.
 """
 
-from kivy.uix.screenmanager import Screen
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.progressbar import ProgressBar
-from kivy.uix.popup import Popup
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QLineEdit, QComboBox, QGridLayout, QDialog, QMessageBox,
+    QProgressBar, QTableWidget, QTableWidgetItem
+)
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt, QTimer
 from datetime import datetime
 import logging
 from core.inventory import InventoryManager
@@ -23,16 +24,15 @@ from database.db_manager import db
 logger = logging.getLogger(__name__)
 
 
-class SellingScreen(Screen):
+class SellingScreen(QWidget):
     """Selling flow screen."""
     
-    def __init__(self, app_instance, **kwargs):
-        super().__init__(**kwargs)
-        self.app = app_instance
-        self.name = 'selling'
+    def __init__(self, app):
+        super().__init__()
+        self.app = app
         
-        self.inventory = InventoryManager(app_instance.app_config)
-        self.billing = BillingEngine(app_instance.app_config)
+        self.inventory = InventoryManager(app.app_config)
+        self.billing = BillingEngine(app.app_config)
         self.payment_sim = PaymentSimulator()
         
         self.session = None
@@ -44,138 +44,101 @@ class SellingScreen(Screen):
     
     def _build_ui(self):
         """Build selling UI."""
-        layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
         
         # Header
-        header = BoxLayout(size_hint_y=0.1, spacing=10)
+        header_layout = QHBoxLayout()
         
-        self.title_label = Label(
-            text='[b]SELLING FLOW[/b]',
-            markup=True,
-            font_size='28sp'
-        )
-        header.add_widget(self.title_label)
+        self.title_label = QLabel('SELLING FLOW')
+        title_font = QFont()
+        title_font.setPointSize(20)
+        title_font.setBold(True)
+        self.title_label.setFont(title_font)
+        header_layout.addWidget(self.title_label, stretch=1)
         
-        btn_back = Button(
-            text='← Back',
-            font_size='20sp',
-            size_hint_x=0.2,
-            background_color=(0.8, 0.2, 0.2, 1)
-        )
-        btn_back.bind(on_press=self._on_back)
-        header.add_widget(btn_back)
+        btn_back = QPushButton('← Back')
+        btn_back.setFont(QFont('Arial', 12))
+        btn_back.setFixedWidth(100)
+        btn_back.setStyleSheet("background-color: #CC3333; color: white;")
+        btn_back.clicked.connect(self._on_back)
+        header_layout.addWidget(btn_back)
         
-        layout.add_widget(header)
+        layout.addLayout(header_layout)
         
-        # Progress
-        self.progress = ProgressBar(max=100, size_hint_y=0.05)
-        layout.add_widget(self.progress)
+        # Progress bar
+        self.progress = QProgressBar()
+        self.progress.setMaximum(100)
+        self.progress.setValue(0)
+        layout.addWidget(self.progress)
         
-        # Content
-        self.content_area = BoxLayout(orientation='vertical', size_hint_y=0.7, padding=20, spacing=15)
-        layout.add_widget(self.content_area)
-        
-        # Controls
-        self.control_buttons = BoxLayout(size_hint_y=0.15, spacing=10)
-        layout.add_widget(self.control_buttons)
-        
-        self.add_widget(layout)
-    
-    def on_enter(self):
-        """Initialize screen."""
-        user_id = self.app.current_user['id']
-        self.session = SessionManager(operator_id=user_id, mode='selling')
-        
-        self._show_batch_scan()
-    
-    def _show_batch_scan(self):
-        """Step 1: Scan batch RFID."""
-        self.content_area.clear_widgets()
-        self.control_buttons.clear_widgets()
-        
-        self.title_label.text = '[b]Step 1: Scan Batch RFID[/b]'
-        self.progress.value = 20
-        
-        info = BoxLayout(orientation='vertical', spacing=10)
-        
-        info.add_widget(Label(
-            text='[b]Scan the RFID tag on the sacks...[/b]',
-            markup=True,
-            font_size='28sp',
-            color=(0, 1, 0, 1),
-            size_hint_y=0.5
-        ))
-        
-        self.content_area.add_widget(info)
+        # Content area
+        self.content_area = QVBoxLayout()
+        layout.addLayout(self.content_area, stretch=1)
         
         # Control buttons
-        btn_scan = Button(
-            text='Start Scan',
-            font_size='22sp',
-            background_color=(0.2, 0.6, 0.2, 1)
-        )
-        btn_scan.bind(on_press=self._on_rfid_scan)
-        self.control_buttons.add_widget(btn_scan)
+        self.control_buttons = QHBoxLayout()
+        layout.addLayout(self.control_buttons)
         
-        btn_manual = Button(
-            text='Manual Entry (Sim)',
-            font_size='22sp',
-            background_color=(0.6, 0.6, 0.2, 1)
-        )
-        btn_manual.bind(on_press=self._on_manual_rfid)
-        self.control_buttons.add_widget(btn_manual)
+        self.setLayout(layout)
+        
+        # Show batch scan screen
+        self.show_batch_scan()
     
-    def _on_rfid_scan(self, *args):
+    def show_batch_scan(self):
+        """Step 1: Scan batch RFID."""
+        self._clear_content()
+        
+        self.title_label.setText('Step 1: Scan Batch RFID')
+        self.progress.setValue(20)
+        
+        info = QVBoxLayout()
+        
+        scan_label = QLabel('Scan the RFID tag on the sacks...')
+        scan_label.setFont(QFont('Arial', 16, QFont.Bold))
+        scan_label.setStyleSheet("color: green;")
+        info.addWidget(scan_label, stretch=1)
+        
+        self.content_area.addLayout(info, stretch=1)
+        
+        # Control buttons
+        btn_scan = QPushButton('Start Scan')
+        btn_scan.setFixedHeight(50)
+        btn_scan.setStyleSheet("background-color: #33CC33; color: white;")
+        btn_scan.clicked.connect(self._on_rfid_scan)
+        self.control_buttons.addWidget(btn_scan)
+        
+        btn_manual = QPushButton('Manual Entry (Sim)')
+        btn_manual.setFixedHeight(50)
+        btn_manual.setStyleSheet("background-color: #FFAA00; color: white;")
+        btn_manual.clicked.connect(self._on_manual_rfid)
+        self.control_buttons.addWidget(btn_manual)
+    
+    def _on_rfid_scan(self):
         """Perform RFID scan."""
         hw = get_hardware()
+        uid = hw.rfid.read_uid(timeout=10)
         
-        popup_content = BoxLayout(orientation='vertical', padding=20, spacing=10)
-        popup_content.add_widget(Label(text='Scanning RFID...', font_size='24sp'))
-        
-        progress = ProgressBar(max=100)
-        popup_content.add_widget(progress)
-        
-        popup = Popup(
-            title='RFID Scan',
-            content=popup_content,
-            size_hint=(0.5, 0.3),
-            auto_dismiss=False
-        )
-        popup.open()
-        
-        import threading
-        
-        def scan_thread():
-            uid = hw.rfid.read_uid(timeout=10)
-            
-            from kivy.clock import Clock
-            Clock.schedule_once(lambda dt: popup.dismiss(), 0)
-            
-            if uid:
-                Clock.schedule_once(lambda dt: self._on_rfid_received(uid), 0)
-            else:
-                Clock.schedule_once(lambda dt: self._show_error("RFID scan timeout"), 0)
-        
-        thread = threading.Thread(target=scan_thread, daemon=True)
-        thread.start()
+        if uid:
+            self._on_rfid_received(uid)
+        else:
+            QMessageBox.warning(self, 'Error', 'RFID scan timeout')
     
-    def _on_manual_rfid(self, *args):
+    def _on_manual_rfid(self):
         """Manual RFID entry (simulation)."""
-        # Get a stored batch
-        row = db.fetchone(
-            "SELECT rfid_uid FROM batches WHERE status = 'stored' LIMIT 1"
-        )
+        row = db.fetchone("SELECT rfid_uid FROM batches WHERE status = 'stored' LIMIT 1")
         if row:
             self._on_rfid_received(row['rfid_uid'])
         else:
-            self._show_error("No stored batches found")
+            QMessageBox.warning(self, 'Error', 'No stored batches found')
     
     def _on_rfid_received(self, uid):
         """Handle RFID scan result."""
         batch = db.get_batch_by_rfid(uid)
         
         if not batch:
-            self._show_error(f"Batch not found for RFID {uid}")
+            QMessageBox.critical(self, 'Error', f'Batch not found for RFID {uid}')
             return
         
         self.batch = batch
@@ -183,31 +146,38 @@ class SellingScreen(Screen):
         self.flow_data['batch_id'] = batch['id']
         self.flow_data['farmer_id'] = self.farmer['id']
         
+        user_id = self.app.current_user['id']
+        self.session = SessionManager(operator_id=user_id, mode='selling')
         self.session.start(farmer_id=self.farmer['id'])
         
         logger.info(f"Batch found: {batch['batch_code']}")
         
-        self._show_batch_details()
+        self.show_batch_details()
     
-    def _show_batch_details(self):
+    def show_batch_details(self):
         """Step 2: Show batch details and calculate amount."""
-        self.content_area.clear_widgets()
-        self.control_buttons.clear_widgets()
+        self._clear_content()
         
-        self.title_label.text = '[b]Step 2: Batch Details[/b]'
-        self.progress.value = 50
+        self.title_label.setText('Step 2: Batch Details')
+        self.progress.setValue(50)
         
         batch = self.batch
         
-        details = BoxLayout(orientation='vertical', spacing=10, padding=10)
+        details = QVBoxLayout()
         
-        details.add_widget(Label(text='[b]Batch Information[/b]', markup=True, font_size='24sp', size_hint_y=0.1))
-        details.add_widget(Label(text=f"Batch Code: {batch['batch_code']}", font_size='18sp', size_hint_y=0.08))
-        details.add_widget(Label(text=f"Farmer: {batch['farmer_name']}", font_size='18sp', size_hint_y=0.08))
-        details.add_widget(Label(text=f"Crop: {batch['crop_type'].upper()}", font_size='18sp', size_hint_y=0.08))
-        details.add_widget(Label(text=f"Weight: {batch['weight_kg']:.2f} kg", font_size='18sp', size_hint_y=0.08))
-        details.add_widget(Label(text=f"Quality: Grade {batch['quality_grade']}", font_size='18sp', size_hint_y=0.08))
-        details.add_widget(Label(text=f"Stored: {batch['storage_date']}", font_size='18sp', size_hint_y=0.08))
+        title = QLabel('[Batch Information]')
+        title_font = QFont()
+        title_font.setPointSize(16)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        details.addWidget(title)
+        
+        details.addWidget(QLabel(f"Batch Code: {batch['batch_code']}"))
+        details.addWidget(QLabel(f"Farmer: {batch['farmer_name']}"))
+        details.addWidget(QLabel(f"Crop: {batch['crop_type'].upper()}"))
+        details.addWidget(QLabel(f"Weight: {batch['weight_kg']:.2f} kg"))
+        details.addWidget(QLabel(f"Quality: Grade {batch['quality_grade']}"))
+        details.addWidget(QLabel(f"Stored: {batch['storage_date']}"))
         
         # Calculate selling amount
         amount, breakdown = self.billing.calculate_selling_amount(
@@ -219,43 +189,41 @@ class SellingScreen(Screen):
         self.flow_data['amount'] = amount
         self.flow_data['billing_breakdown'] = breakdown
         
-        details.add_widget(Label(text='', size_hint_y=0.05))  # Spacer
+        details.addSpacing(20)
         
-        details.add_widget(Label(
-            text=f"[b]Amount to Pay Farmer: ₹{amount:.2f}[/b]",
-            markup=True,
-            font_size='28sp',
-            color=(0, 1, 0, 1),
-            size_hint_y=0.15
-        ))
+        amount_label = QLabel(f"Amount to Pay Farmer: ₹{amount:.2f}")
+        amount_font = QFont()
+        amount_font.setPointSize(18)
+        amount_font.setBold(True)
+        amount_label.setFont(amount_font)
+        amount_label.setStyleSheet("color: green;")
+        details.addWidget(amount_label)
         
-        details.add_widget(Label(
-            text=f"(Rate: ₹{breakdown['base_rate']}/kg)",
-            font_size='16sp',
-            size_hint_y=0.08
-        ))
+        rate_label = QLabel(f"(Rate: ₹{breakdown['base_rate']:.2f}/kg)")
+        details.addWidget(rate_label)
         
-        self.content_area.add_widget(details)
+        self.content_area.addLayout(details, stretch=1)
         
         # Control button
-        btn_proceed = Button(
-            text='Proceed to Payout',
-            font_size='24sp',
-            bold=True,
-            background_color=(0.2, 0.6, 0.2, 1)
-        )
-        btn_proceed.bind(on_press=self._show_payment)
-        self.control_buttons.add_widget(btn_proceed)
+        btn_proceed = QPushButton('Proceed to Payout')
+        btn_proceed.setFixedHeight(60)
+        btn_proceed.setFont(QFont('Arial', 14, QFont.Bold))
+        btn_proceed.setStyleSheet("background-color: #33CC33; color: white;")
+        btn_proceed.clicked.connect(self._show_payment)
+        self.control_buttons.addWidget(btn_proceed)
     
-    def _show_payment(self, *args):
+    def _show_payment(self):
         """Show payout screen."""
-        payment_screen = self.manager.get_screen('payment')
-        payment_screen.setup_payment(
+        self.app.show_screen('payment')
+        self.app.screens['payment'].setup_payment(
             amount=self.flow_data['amount'],
             transaction_type='selling',
-            on_payment_complete=self._on_payout_complete
+            flow_data=self.flow_data,
+            farmer=self.farmer,
+            session=self.session,
+            batch=self.batch,
+            on_complete=self._on_payout_complete
         )
-        self.manager.current = 'payment'
     
     def _on_payout_complete(self, payout_ref):
         """Handle payout completion."""
@@ -324,56 +292,36 @@ class SellingScreen(Screen):
         # Commit session
         self.session.commit()
         
-        # Show receipt
-        self._show_receipt(txn_id)
+        # Show success
+        self.progress.setValue(100)
+        QMessageBox.information(self, 'Success', 
+            f'Selling completed successfully!\n\n'
+            f'Amount: ₹{self.flow_data["amount"]:.2f}\n'
+            f'WhatsApp notification sent to farmer.')
+        
+        # Return to startup
+        self.app.show_screen('startup')
     
-    def _show_receipt(self, txn_id):
-        """Show receipt."""
-        self.progress.value = 100
+    def _clear_content(self):
+        """Clear content area."""
+        while self.content_area.count():
+            widget = self.content_area.takeAt(0).widget()
+            if widget:
+                widget.deleteLater()
+            else:
+                layout = self.content_area.takeAt(0)
+                while layout and layout.count():
+                    item = layout.takeAt(0)
+                    if item.widget():
+                        item.widget().deleteLater()
         
-        receipt_data = self.payment_sim.generate_receipt(txn_id, self.app.current_language)
-        
-        from ui.components.receipt_viewer import ReceiptViewer
-        
-        receipt_viewer = ReceiptViewer()
-        receipt_viewer.show_receipt(receipt_data)
-        
-        popup = Popup(
-            title='Selling Receipt',
-            content=receipt_viewer,
-            size_hint=(0.9, 0.9)
-        )
-        
-        original_close = receipt_viewer._on_close
-        
-        def new_close(*args):
-            popup.dismiss()
-            self.manager.current = 'startup'
-        
-        receipt_viewer._on_close = new_close
-        
-        popup.open()
+        while self.control_buttons.count():
+            widget = self.control_buttons.takeAt(0).widget()
+            if widget:
+                widget.deleteLater()
     
-    def _show_error(self, message):
-        """Show error popup."""
-        content = BoxLayout(orientation='vertical', padding=20, spacing=10)
-        content.add_widget(Label(text=message, font_size='20sp'))
-        
-        popup = Popup(
-            title='Error',
-            content=content,
-            size_hint=(0.6, 0.3)
-        )
-        
-        btn_ok = Button(text='OK', font_size='20sp', size_hint_y=0.3)
-        btn_ok.bind(on_press=popup.dismiss)
-        content.add_widget(btn_ok)
-        
-        popup.open()
-        logger.error(message)
-    
-    def _on_back(self, *args):
+    def _on_back(self):
         """Go back to startup."""
         if self.session:
             self.session.rollback()
-        self.manager.current = 'startup' 
+        self.app.show_screen('startup')

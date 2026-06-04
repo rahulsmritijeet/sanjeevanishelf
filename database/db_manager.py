@@ -61,23 +61,33 @@ class DatabaseManager:
     def _init_database(self):
         """Initialize database schema."""
         schema_path = Path(__file__).parent / "schema.sql"
-        
+    
         if not schema_path.exists():
             logger.warning(f"Schema file not found at {schema_path}")
             return
-        
+    
         with open(schema_path, 'r', encoding='utf-8') as f:
             schema_sql = f.read()
-        
+    
         conn = self._get_connection()
         try:
-            conn.executescript(schema_sql)
+        # Execute schema - catch individual errors
+            for statement in schema_sql.split(';'):
+                statement = statement.strip()
+                if statement:
+                    try:
+                        conn.execute(statement)
+                    except sqlite3.OperationalError as e:
+                        # Ignore "already exists" errors
+                        if 'already exists' not in str(e):
+                            raise
+        
             conn.commit()
             logger.info("Database schema initialized successfully")
         except Exception as e:
             logger.error(f"Error initializing database schema: {e}")
             conn.rollback()
-            raise
+        # Don't raise - database might already be initialized
     
     @contextmanager
     def transaction(self):

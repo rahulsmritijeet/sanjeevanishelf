@@ -1,5 +1,5 @@
 """
-Storage Screen - PyQt5
+Storage Flow Screen - PyQt5
 Complete storage workflow with hardware integration.
 """
 
@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
     QProgressBar, QSpinBox, QDoubleSpinBox
 )
 from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from datetime import datetime, date
 import logging
 from core.inventory import InventoryManager
@@ -106,7 +106,11 @@ class StorageScreen(QWidget):
         self.phone_input.setFont(QFont('Arial', 16))
         self.phone_input.setFixedHeight(50)
         self.phone_input.setMaxLength(10)
+        self.phone_input.setPlaceholderText('9876543210')
         self.content_area.addWidget(self.phone_input)
+        
+        # Add stretch to push everything up
+        self.content_area.addStretch(1)
         
         # Button
         btn_search = QPushButton('Search Farmer')
@@ -118,7 +122,7 @@ class StorageScreen(QWidget):
     
     def _on_phone_submitted(self):
         """Handle phone submission."""
-        phone = self.phone_input.text()
+        phone = self.phone_input.text().strip()
         
         if len(phone) != 10:
             QMessageBox.warning(self, 'Error', 'Please enter 10-digit phone number')
@@ -207,18 +211,21 @@ class StorageScreen(QWidget):
         self.title_label.setText('Step 2: RFID Scan')
         self.progress.setValue(25)
         
-        info = QVBoxLayout()
+        info_widget = QWidget()
+        info_layout = QVBoxLayout()
         
         farmer_label = QLabel(f"Farmer: {self.farmer['name']} ({self.farmer['phone']})")
         farmer_label.setFont(QFont('Arial', 12))
-        info.addWidget(farmer_label)
+        info_layout.addWidget(farmer_label)
         
         scan_label = QLabel('Place RFID tag near scanner...')
         scan_label.setFont(QFont('Arial', 16, QFont.Bold))
         scan_label.setStyleSheet("color: green;")
-        info.addWidget(scan_label, stretch=1)
+        scan_label.setAlignment(Qt.AlignCenter)
+        info_layout.addWidget(scan_label, stretch=1)
         
-        self.content_area.addLayout(info, stretch=1)
+        info_widget.setLayout(info_layout)
+        self.content_area.addWidget(info_widget, stretch=1)
         
         # Buttons
         btn_scan = QPushButton('Start Scan')
@@ -271,11 +278,12 @@ class StorageScreen(QWidget):
         self.title_label.setText('Step 3: Weight Measurement')
         self.progress.setValue(40)
         
-        info = QVBoxLayout()
+        info_widget = QWidget()
+        info_layout = QVBoxLayout()
         
         label = QLabel('Place crop on the scale')
         label.setFont(QFont('Arial', 14))
-        info.addWidget(label)
+        info_layout.addWidget(label)
         
         self.weight_label = QLabel('Weight: --- kg')
         weight_font = QFont()
@@ -283,9 +291,11 @@ class StorageScreen(QWidget):
         weight_font.setBold(True)
         self.weight_label.setFont(weight_font)
         self.weight_label.setStyleSheet("color: green;")
-        info.addWidget(self.weight_label, stretch=1)
+        self.weight_label.setAlignment(Qt.AlignCenter)
+        info_layout.addWidget(self.weight_label, stretch=1)
         
-        self.content_area.addLayout(info, stretch=1)
+        info_widget.setLayout(info_layout)
+        self.content_area.addWidget(info_widget, stretch=1)
         
         # Buttons
         btn_tare = QPushButton('Tare Scale')
@@ -319,8 +329,7 @@ class StorageScreen(QWidget):
             self.flow_data['weight_kg'] = weight
             self.weight_label.setText(f'Weight: {weight:.2f} kg')
             
-            # Auto-advance
-            from PyQt5.QtCore import QTimer
+            # Auto-advance after 2 seconds
             QTimer.singleShot(2000, self.show_moisture_measurement)
         else:
             QMessageBox.warning(self, 'Error', 'Invalid weight reading')
@@ -332,11 +341,12 @@ class StorageScreen(QWidget):
         self.title_label.setText('Step 4: Moisture Measurement')
         self.progress.setValue(55)
         
-        info = QVBoxLayout()
+        info_widget = QWidget()
+        info_layout = QVBoxLayout()
         
         label = QLabel('Insert moisture probe into crop')
         label.setFont(QFont('Arial', 14))
-        info.addWidget(label)
+        info_layout.addWidget(label)
         
         self.moisture_label = QLabel('Moisture: ---%')
         moisture_font = QFont()
@@ -344,9 +354,11 @@ class StorageScreen(QWidget):
         moisture_font.setBold(True)
         self.moisture_label.setFont(moisture_font)
         self.moisture_label.setStyleSheet("color: green;")
-        info.addWidget(self.moisture_label, stretch=1)
+        self.moisture_label.setAlignment(Qt.AlignCenter)
+        info_layout.addWidget(self.moisture_label, stretch=1)
         
-        self.content_area.addLayout(info, stretch=1)
+        info_widget.setLayout(info_layout)
+        self.content_area.addWidget(info_widget, stretch=1)
         
         btn_read = QPushButton('Read Moisture')
         btn_read.setFixedHeight(50)
@@ -364,7 +376,6 @@ class StorageScreen(QWidget):
             self.flow_data['moisture_percent'] = avg_moisture
             self.moisture_label.setText(f'Moisture: {avg_moisture:.2f}%')
             
-            from PyQt5.QtCore import QTimer
             QTimer.singleShot(2000, self.show_crop_selection)
         else:
             QMessageBox.warning(self, 'Error', 'Failed to read moisture')
@@ -381,6 +392,8 @@ class StorageScreen(QWidget):
         self.content_area.addWidget(label)
         
         crops = ['rice', 'wheat', 'maize', 'pulses']
+        
+        crop_widget = QWidget()
         crop_grid = QGridLayout()
         
         for i, crop in enumerate(crops):
@@ -391,7 +404,8 @@ class StorageScreen(QWidget):
             btn.clicked.connect(lambda checked, c=crop: self._on_crop_selected(c))
             crop_grid.addWidget(btn, i // 2, i % 2)
         
-        self.content_area.addLayout(crop_grid, stretch=1)
+        crop_widget.setLayout(crop_grid)
+        self.content_area.addWidget(crop_widget, stretch=1)
     
     def _on_crop_selected(self, crop_type):
         """Handle crop selection."""
@@ -461,19 +475,23 @@ class StorageScreen(QWidget):
         self.title_label.setText('Storage Summary')
         self.progress.setValue(85)
         
-        summary = QVBoxLayout()
+        summary_widget = QWidget()
+        summary_layout = QVBoxLayout()
         
         data = self.flow_data
         
-        summary.addWidget(QLabel('[Storage Details]'))
-        summary.addWidget(QLabel(f"Farmer: {self.farmer['name']}"))
-        summary.addWidget(QLabel(f"Crop: {data['crop_type'].upper()}"))
-        summary.addWidget(QLabel(f"Weight: {data['weight_kg']:.2f} kg"))
-        summary.addWidget(QLabel(f"Quality: Grade {data['quality_grade']}"))
-        summary.addWidget(QLabel(f"Stack: {data['stack_location']}"))
-        summary.addWidget(QLabel(f"Expiry: {data['expiry_date']}"))
+        title = QLabel('[Storage Details]')
+        title.setFont(QFont('Arial', 14, QFont.Bold))
+        summary_layout.addWidget(title)
         
-        summary.addSpacing(20)
+        summary_layout.addWidget(QLabel(f"Farmer: {self.farmer['name']}"))
+        summary_layout.addWidget(QLabel(f"Crop: {data['crop_type'].upper()}"))
+        summary_layout.addWidget(QLabel(f"Weight: {data['weight_kg']:.2f} kg"))
+        summary_layout.addWidget(QLabel(f"Quality: Grade {data['quality_grade']}"))
+        summary_layout.addWidget(QLabel(f"Stack: {data['stack_location']}"))
+        summary_layout.addWidget(QLabel(f"Expiry: {data['expiry_date']}"))
+        
+        summary_layout.addSpacing(20)
         
         amount_label = QLabel(f"Storage Fee: ₹{data['storage_fee']:.2f}")
         amount_font = QFont()
@@ -481,9 +499,12 @@ class StorageScreen(QWidget):
         amount_font.setBold(True)
         amount_label.setFont(amount_font)
         amount_label.setStyleSheet("color: green;")
-        summary.addWidget(amount_label)
+        summary_layout.addWidget(amount_label)
         
-        self.content_area.addLayout(summary, stretch=1)
+        summary_layout.addStretch(1)
+        
+        summary_widget.setLayout(summary_layout)
+        self.content_area.addWidget(summary_widget, stretch=1)
         
         btn_payment = QPushButton('Proceed to Payment')
         btn_payment.setFixedHeight(60)
@@ -590,28 +611,34 @@ class StorageScreen(QWidget):
         
         # Show receipt
         self.progress.setValue(100)
-        QMessageBox.information(self, 'Success', 'Storage completed successfully!\n\nWhatsApp notification sent to farmer.')
+        QMessageBox.information(self, 'Success', 
+            f'Storage completed successfully!\n\n'
+            f'Batch Code: {batch_code}\n'
+            f'Storage Fee: ₹{self.flow_data["storage_fee"]:.2f}\n\n'
+            f'WhatsApp notification sent to farmer.')
         
         # Return to startup
         self.app.show_screen('startup')
     
     def _clear_content(self):
-        """Clear content area."""
-        while self.content_area.count():
-            widget = self.content_area.takeAt(0).widget()
-            if widget:
-                widget.deleteLater()
-            else:
-                layout = self.content_area.takeAt(0)
-                while layout.count():
-                    item = layout.takeAt(0)
-                    if item.widget():
-                        item.widget().deleteLater()
+        """Clear content area safely."""
+        # Clear content_area
+        if self.content_area:
+            while self.content_area.count():
+                item = self.content_area.takeAt(0)
+                if item:
+                    widget = item.widget()
+                    if widget:
+                        widget.deleteLater()
         
-        while self.control_buttons.count():
-            widget = self.control_buttons.takeAt(0).widget()
-            if widget:
-                widget.deleteLater()
+        # Clear control_buttons
+        if self.control_buttons:
+            while self.control_buttons.count():
+                item = self.control_buttons.takeAt(0)
+                if item:
+                    widget = item.widget()
+                    if widget:
+                        widget.deleteLater()
     
     def _on_back(self):
         """Go back to startup."""
