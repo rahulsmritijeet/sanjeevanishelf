@@ -1,0 +1,43 @@
+# Sanjeevani Shelf v1.1 - Raspberry Pi Requirements
+# Install with: pip install -r rpi_requirements.txt
+#
+# NOTE: PyQt5 should be installed system-wide on Pi OS:
+#   sudo apt install python3-pyqt5
+#
+# Then activate venv and run this file
+
+# Configuration
+PyYAML==6.0.1
+
+# Hardware Communication (Bluetooth Serial)
+pyserial==3.5
+
+# QR Code Generation
+qrcode==7.4.2
+Pillow==10.2.0
+
+# Payment Gateway
+razorpay==1.4.1
+
+# SMS Notifications
+twilio==8.10.0
+
+# Security
+bcrypt==4.1.2
+
+# Date/Time Utilities
+python-dateutil==2.8.2
+
+# Reports & Export
+openpyxl==3.1.2
+reportlab==4.0.9
+
+# HTTP Requests
+requests==2.31.0
+
+# Utilities
+six==1.16.0
+
+# NOTE: Do NOT install these on Pi (system packages handle them):
+# PyQt5 - use: sudo apt install python3-pyqt5
+# kivy  - not needed

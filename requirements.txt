@@ -1,14 +1,40 @@
+# Sanjeevani Shelf v1.1 - Windows Requirements
+# Python 3.11 - 3.14 compatible
+# Install with: pip install -r requirements.txt
+
+# UI Framework
 PyQt5==5.15.9
-PyQt5-sip==12.13.0
-pyserial==3.5
-qrcode==7.4.2
-Pillow==10.2.0
-razorpay==1.4.1
-pywhatkit==5.4
-openpyxl==3.1.2
-reportlab==4.0.9
-PyYAML==6.0.1
-bcrypt==4.1.2
-python-dateutil==2.8.2
-pytest==8.0.0
-pytest-cov==4.1.0
+PyQt5-sip>=12.13.0
+
+# Configuration
+PyYAML>=6.0.1
+
+# Hardware Communication
+pyserial>=3.5
+
+# QR Code Generation
+qrcode>=7.4.2
+Pillow>=10.4.0
+
+# Payment Gateway
+razorpay>=1.4.1
+
+# SMS Notifications
+twilio>=8.10.0
+
+# Security
+bcrypt>=4.1.2
+
+# Date/Time Utilities
+python-dateutil>=2.8.2
+
+# Reports & Export
+openpyxl>=3.1.2
+reportlab>=4.1.0
+
+# HTTP Requests
+requests>=2.31.0
+
+# Testing
+pytest>=8.0.0
+pytest-cov>=4.1.0
