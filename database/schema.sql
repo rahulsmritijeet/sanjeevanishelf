@@ -1,4 +1,5 @@
 -- Sanjeevani Shelf v1.1 Database Schema
+-- Fixed: IF NOT EXISTS on all indexes, expanded CHECK constraints
 
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
@@ -23,11 +24,11 @@ CREATE TABLE IF NOT EXISTS crop_capacity (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Users (Operators, Managers)
+-- Users
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
-    pin_hash TEXT NOT NULL,  -- bcrypt hash
+    pin_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('operator', 'manager', 'admin')),
     full_name TEXT,
     active INTEGER DEFAULT 1,
@@ -40,12 +41,12 @@ CREATE TABLE IF NOT EXISTS farmers (
     phone TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     village TEXT,
-    aadhaar_hash TEXT,  -- Hashed for privacy
+    aadhaar_hash TEXT,
     bank_account TEXT,
     ifsc TEXT,
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     total_transactions INTEGER DEFAULT 0,
-    current_balance REAL DEFAULT 0  -- For dues/advances
+    current_balance REAL DEFAULT 0
 );
 
 -- RFID Tags
@@ -55,11 +56,10 @@ CREATE TABLE IF NOT EXISTS rfid_tags (
     status TEXT DEFAULT 'available' CHECK(status IN ('available', 'assigned', 'damaged', 'lost')),
     assigned_to_batch_id INTEGER,
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_scan TIMESTAMP,
-    FOREIGN KEY (assigned_to_batch_id) REFERENCES batches(id) ON DELETE SET NULL
+    last_scan TIMESTAMP
 );
 
--- Batches (Storage Units)
+-- Batches
 CREATE TABLE IF NOT EXISTS batches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     batch_code TEXT UNIQUE NOT NULL,
@@ -81,24 +81,26 @@ CREATE TABLE IF NOT EXISTS batches (
     FOREIGN KEY (rfid_uid) REFERENCES rfid_tags(uid)
 );
 
-CREATE INDEX idx_batches_status ON batches(status);
-CREATE INDEX idx_batches_expiry ON batches(expiry_date);
-CREATE INDEX idx_batches_farmer ON batches(farmer_id);
+CREATE INDEX IF NOT EXISTS idx_batches_status ON batches(status);
+CREATE INDEX IF NOT EXISTS idx_batches_expiry ON batches(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_batches_farmer ON batches(farmer_id);
 
--- Transactions (Storage, Selling, Buying)
+-- Transactions
 CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     txn_type TEXT NOT NULL CHECK(txn_type IN ('storage', 'selling', 'buying')),
     txn_code TEXT UNIQUE NOT NULL,
     farmer_id INTEGER NOT NULL,
-    batch_id INTEGER,  -- NULL for buying (creates new batch)
+    batch_id INTEGER,
     operator_id INTEGER NOT NULL,
     crop_type TEXT NOT NULL,
     weight_kg REAL NOT NULL,
-    amount REAL NOT NULL,  -- Positive = farmer pays, Negative = farmer receives
+    amount REAL NOT NULL,
     payment_status TEXT DEFAULT 'pending' CHECK(payment_status IN ('pending', 'paid', 'failed', 'refunded')),
-    payment_method TEXT CHECK(payment_method IN ('cash', 'upi', 'razorpay', 'simulation')),
+    payment_method TEXT,
     payment_ref TEXT,
+    cash_amount REAL DEFAULT 0,
+    upi_amount REAL DEFAULT 0,
     razorpay_qr_url TEXT,
     razorpay_order_id TEXT,
     txn_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -108,24 +110,26 @@ CREATE TABLE IF NOT EXISTS transactions (
     FOREIGN KEY (operator_id) REFERENCES users(id)
 );
 
-CREATE INDEX idx_txn_farmer ON transactions(farmer_id);
-CREATE INDEX idx_txn_date ON transactions(txn_date);
-CREATE INDEX idx_txn_payment ON transactions(payment_status);
+CREATE INDEX IF NOT EXISTS idx_txn_farmer ON transactions(farmer_id);
+CREATE INDEX IF NOT EXISTS idx_txn_date ON transactions(txn_date);
+CREATE INDEX IF NOT EXISTS idx_txn_payment ON transactions(payment_status);
 
--- Payment Events (Audit Trail)
+-- Payment Events (NO foreign key - allows logging before transaction exists)
 CREATE TABLE IF NOT EXISTS payment_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    transaction_id INTEGER NOT NULL,
-    event_type TEXT NOT NULL CHECK(event_type IN ('qr_generated', 'payment_initiated', 'payment_success', 'payment_failed', 'payout_initiated', 'payout_success', 'payout_failed')),
+    transaction_id INTEGER DEFAULT 0,
+    event_type TEXT NOT NULL,
     amount REAL,
     payment_ref TEXT,
-    razorpay_data TEXT,  -- JSON blob
+    payment_method TEXT,
+    cash_amount REAL DEFAULT 0,
+    upi_amount REAL DEFAULT 0,
+    razorpay_data TEXT,
     simulated INTEGER DEFAULT 0,
-    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (transaction_id) REFERENCES transactions(id)
+    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- WhatsApp Alerts Queue
+-- WhatsApp/SMS Queue
 CREATE TABLE IF NOT EXISTS whatsapp_queue (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     recipient_phone TEXT NOT NULL,
@@ -140,42 +144,40 @@ CREATE TABLE IF NOT EXISTS whatsapp_queue (
     error TEXT
 );
 
-CREATE INDEX idx_whatsapp_status ON whatsapp_queue(status);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_status ON whatsapp_queue(status);
 
--- Sessions (for rollback/recovery)
+-- Sessions (ALL statuses)
 CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT UNIQUE NOT NULL,
     operator_id INTEGER NOT NULL,
     mode TEXT NOT NULL CHECK(mode IN ('storage', 'selling', 'buying')),
     farmer_id INTEGER,
-    status TEXT DEFAULT 'open' CHECK(status IN ('open', 'committed', 'rolled_back')),
+    status TEXT DEFAULT 'open' CHECK(status IN ('open', 'committed', 'rolled_back', 'cancelled', 'timed_out', 'recovered', 'force_rolled_back')),
     started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ended_at TIMESTAMP,
-    snapshot_data TEXT,  -- JSON of session state for rollback
+    snapshot_data TEXT,
     FOREIGN KEY (operator_id) REFERENCES users(id),
     FOREIGN KEY (farmer_id) REFERENCES farmers(id)
 );
 
--- Event Log (Full Audit Trail)
+-- Event Log
 CREATE TABLE IF NOT EXISTS event_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT,
     event_type TEXT NOT NULL,
-    entity_type TEXT,  -- batch, transaction, rfid, etc.
+    entity_type TEXT,
     entity_id INTEGER,
-    old_value TEXT,  -- JSON
-    new_value TEXT,  -- JSON
+    old_value TEXT,
+    new_value TEXT,
     operator_id INTEGER,
-    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (session_id) REFERENCES sessions(session_id),
-    FOREIGN KEY (operator_id) REFERENCES users(id)
+    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_event_session ON event_log(session_id);
-CREATE INDEX idx_event_time ON event_log(occurred_at);
+CREATE INDEX IF NOT EXISTS idx_event_session ON event_log(session_id);
+CREATE INDEX IF NOT EXISTS idx_event_time ON event_log(occurred_at);
 
--- Stack Allocation (Physical Storage Locations)
+-- Stack Locations
 CREATE TABLE IF NOT EXISTS stack_locations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     location_code TEXT UNIQUE NOT NULL,
@@ -186,48 +188,49 @@ CREATE TABLE IF NOT EXISTS stack_locations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Moisture Readings (Historical for quality tracking)
+-- Moisture Readings
 CREATE TABLE IF NOT EXISTS moisture_readings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     batch_id INTEGER,
     rfid_uid TEXT,
-    sensor_id INTEGER,  -- 1-4 for the 4 sensors
+    sensor_id INTEGER,
     moisture_percent REAL NOT NULL,
-    read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (batch_id) REFERENCES batches(id),
-    FOREIGN KEY (rfid_uid) REFERENCES rfid_tags(uid)
+    read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- System Health / Logs
+-- System Health
 CREATE TABLE IF NOT EXISTS system_health (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    component TEXT NOT NULL,  -- rfid, weight, moisture, db, whatsapp, etc.
+    component TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('ok', 'warning', 'error')),
     message TEXT,
     checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Initial Data Seeds
+-- Schema Version
+CREATE TABLE IF NOT EXISTS schema_version (
+    version INTEGER PRIMARY KEY,
+    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed Data
 INSERT OR IGNORE INTO godown_config (id, godown_id, name, location, total_capacity_kg)
 VALUES (1, 'GODOWN001', 'Panchayat Central Storage', 'Village XYZ, District ABC', 100000);
 
 INSERT OR IGNORE INTO crop_capacity (crop_type, allocated_capacity_kg, current_stock_kg)
-VALUES 
+VALUES
     ('rice', 40000, 0),
     ('wheat', 30000, 0),
     ('maize', 15000, 0),
     ('pulses', 15000, 0);
 
--- Default users (PIN: 1234 for all, bcrypt hash below)
--- Hash for '1234': $2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5aq2h8VYj8G0u
 INSERT OR IGNORE INTO users (id, username, pin_hash, role, full_name, active)
-VALUES 
+VALUES
     (1, 'operator', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5aq2h8VYj8G0u', 'operator', 'Demo Operator', 1),
     (2, 'manager', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5aq2h8VYj8G0u', 'manager', 'Demo Manager', 1);
 
--- Sample Stack Locations
 INSERT OR IGNORE INTO stack_locations (location_code, crop_type, capacity_kg, current_weight_kg, status)
-VALUES 
+VALUES
     ('A1-RICE', 'rice', 5000, 0, 'available'),
     ('A2-RICE', 'rice', 5000, 0, 'available'),
     ('B1-WHEAT', 'wheat', 5000, 0, 'available'),
@@ -235,9 +238,8 @@ VALUES
     ('C1-MAIZE', 'maize', 3000, 0, 'available'),
     ('D1-PULSES', 'pulses', 3000, 0, 'available');
 
--- Sample RFID tags for testing
 INSERT OR IGNORE INTO rfid_tags (uid, status)
-VALUES 
+VALUES
     ('0A1B2C3D', 'available'),
     ('1A2B3C4D', 'available'),
     ('2A3B4C5D', 'available'),

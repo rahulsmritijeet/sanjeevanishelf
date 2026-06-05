@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """
 Sanjeevani Shelf v1.1 - Main Entry Point
-PyQt5 Application
 """
 
 import sys
+import os
 from pathlib import Path
+
+# Fix Windows Unicode output
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -15,12 +21,7 @@ from ui.app import SanjeevaniApp
 
 
 if __name__ == "__main__":
-    # Create QApplication FIRST (before any widgets)
     qt_app = QApplication(sys.argv)
-    
-    # Create main window
     window = SanjeevaniApp()
     window.show()
-    
-    # Run the application
     sys.exit(qt_app.exec_())

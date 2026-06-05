@@ -1,12 +1,13 @@
 """
 Selling Flow Screen - PyQt5
 Farmer sells stored crop back to godown.
+With 5-minute session timer, rate breakdown, SMS notification.
 """
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QComboBox, QGridLayout, QDialog, QMessageBox,
-    QProgressBar, QTableWidget, QTableWidgetItem
+    QLineEdit, QGridLayout, QDialog, QMessageBox,
+    QProgressBar, QFrame
 )
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt, QTimer
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class SellingScreen(QWidget):
-    """Selling flow screen."""
+    """Selling flow screen with timer and rate breakdown."""
     
     def __init__(self, app):
         super().__init__()
@@ -40,6 +41,10 @@ class SellingScreen(QWidget):
         self.farmer = None
         self.flow_data = {}
         
+        # Session timer
+        self._session_timer = QTimer(self)
+        self._session_timer.timeout.connect(self._update_session_timer)
+        
         self._build_ui()
     
     def _build_ui(self):
@@ -53,17 +58,28 @@ class SellingScreen(QWidget):
         
         self.title_label = QLabel('SELLING FLOW')
         title_font = QFont()
-        title_font.setPointSize(20)
+        title_font.setPointSize(18)
         title_font.setBold(True)
         self.title_label.setFont(title_font)
         header_layout.addWidget(self.title_label, stretch=1)
         
-        btn_back = QPushButton('← Back')
-        btn_back.setFont(QFont('Arial', 12))
-        btn_back.setFixedWidth(100)
-        btn_back.setStyleSheet("background-color: #CC3333; color: white;")
-        btn_back.clicked.connect(self._on_back)
-        header_layout.addWidget(btn_back)
+        # Timer
+        self.timer_label = QLabel('⏱ 05:00')
+        timer_font = QFont()
+        timer_font.setPointSize(14)
+        timer_font.setBold(True)
+        self.timer_label.setFont(timer_font)
+        self.timer_label.setStyleSheet("color: green; font-weight: bold;")
+        header_layout.addWidget(self.timer_label)
+        
+        # Cancel button
+        btn_cancel = QPushButton('✗ Cancel')
+        btn_cancel.setFont(QFont('Arial', 11))
+        btn_cancel.setFixedWidth(100)
+        btn_cancel.setFixedHeight(40)
+        btn_cancel.setStyleSheet("background-color: #F44336; color: white;")
+        btn_cancel.clicked.connect(self._cancel_session)
+        header_layout.addWidget(btn_cancel)
         
         layout.addLayout(header_layout)
         
@@ -83,8 +99,49 @@ class SellingScreen(QWidget):
         
         self.setLayout(layout)
         
-        # Show batch scan screen
+        # Show batch scan
         self.show_batch_scan()
+    
+    def _update_session_timer(self):
+        """Update timer every second."""
+        if self.session:
+            time_str = self.session.get_time_display()
+            self.timer_label.setText(f"⏱ {time_str}")
+            
+            remaining = self.session.get_remaining_time()
+            if remaining <= 60:
+                self.timer_label.setStyleSheet("color: red; font-weight: bold;")
+            elif remaining <= 120:
+                self.timer_label.setStyleSheet("color: orange; font-weight: bold;")
+            else:
+                self.timer_label.setStyleSheet("color: green; font-weight: bold;")
+            
+            if self.session.is_expired():
+                self._on_session_timeout()
+    
+    def _on_session_timeout(self):
+        """Handle 5-minute timeout."""
+        self._session_timer.stop()
+        QMessageBox.critical(
+            self, "Session Timeout",
+            "5-minute session expired!\nAll changes rolled back.\nPlease start again."
+        )
+        self.app.show_screen('startup')
+    
+    def _cancel_session(self):
+        """Cancel session manually."""
+        reply = QMessageBox.question(
+            self, 'Cancel Session',
+            'Cancel this session?\nAll changes will be lost.',
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            self._session_timer.stop()
+            if self.session:
+                self.session.cancel()
+            self.app.show_screen('startup')
     
     def show_batch_scan(self):
         """Step 1: Scan batch RFID."""
@@ -93,24 +150,36 @@ class SellingScreen(QWidget):
         self.title_label.setText('Step 1: Scan Batch RFID')
         self.progress.setValue(20)
         
-        info = QVBoxLayout()
+        widget = QWidget()
+        vlayout = QVBoxLayout()
         
-        scan_label = QLabel('Scan the RFID tag on the sacks...')
+        info_label = QLabel('Scan the RFID tag on the stored sacks to retrieve batch info.')
+        info_label.setFont(QFont('Arial', 12))
+        info_label.setWordWrap(True)
+        vlayout.addWidget(info_label)
+        
+        vlayout.addSpacing(20)
+        
+        scan_label = QLabel('📡 Place RFID tag near scanner...')
         scan_label.setFont(QFont('Arial', 16, QFont.Bold))
         scan_label.setStyleSheet("color: green;")
-        info.addWidget(scan_label, stretch=1)
+        scan_label.setAlignment(Qt.AlignCenter)
+        vlayout.addWidget(scan_label, stretch=1)
         
-        self.content_area.addLayout(info, stretch=1)
+        widget.setLayout(vlayout)
+        self.content_area.addWidget(widget, stretch=1)
         
-        # Control buttons
-        btn_scan = QPushButton('Start Scan')
+        # Buttons
+        btn_scan = QPushButton('📡 Start Scan')
         btn_scan.setFixedHeight(50)
+        btn_scan.setFont(QFont('Arial', 12))
         btn_scan.setStyleSheet("background-color: #33CC33; color: white;")
         btn_scan.clicked.connect(self._on_rfid_scan)
         self.control_buttons.addWidget(btn_scan)
         
-        btn_manual = QPushButton('Manual Entry (Sim)')
+        btn_manual = QPushButton('🔧 Manual Entry (Sim)')
         btn_manual.setFixedHeight(50)
+        btn_manual.setFont(QFont('Arial', 12))
         btn_manual.setStyleSheet("background-color: #FFAA00; color: white;")
         btn_manual.clicked.connect(self._on_manual_rfid)
         self.control_buttons.addWidget(btn_manual)
@@ -123,22 +192,22 @@ class SellingScreen(QWidget):
         if uid:
             self._on_rfid_received(uid)
         else:
-            QMessageBox.warning(self, 'Error', 'RFID scan timeout')
+            QMessageBox.warning(self, 'Error', 'RFID scan timeout. Try again.')
     
     def _on_manual_rfid(self):
         """Manual RFID entry (simulation)."""
         row = db.fetchone("SELECT rfid_uid FROM batches WHERE status = 'stored' LIMIT 1")
-        if row:
+        if row and row['rfid_uid']:
             self._on_rfid_received(row['rfid_uid'])
         else:
-            QMessageBox.warning(self, 'Error', 'No stored batches found')
+            QMessageBox.warning(self, 'Error', 'No stored batches found in the system.')
     
     def _on_rfid_received(self, uid):
         """Handle RFID scan result."""
         batch = db.get_batch_by_rfid(uid)
         
         if not batch:
-            QMessageBox.critical(self, 'Error', f'Batch not found for RFID {uid}')
+            QMessageBox.critical(self, 'Error', f'No stored batch found for RFID: {uid}')
             return
         
         self.batch = batch
@@ -146,38 +215,24 @@ class SellingScreen(QWidget):
         self.flow_data['batch_id'] = batch['id']
         self.flow_data['farmer_id'] = self.farmer['id']
         
+        # Start session and timer
         user_id = self.app.current_user['id']
         self.session = SessionManager(operator_id=user_id, mode='selling')
         self.session.start(farmer_id=self.farmer['id'])
+        self._session_timer.start(1000)
         
         logger.info(f"Batch found: {batch['batch_code']}")
         
         self.show_batch_details()
     
     def show_batch_details(self):
-        """Step 2: Show batch details and calculate amount."""
+        """Step 2: Show batch details with rate breakdown."""
         self._clear_content()
         
-        self.title_label.setText('Step 2: Batch Details')
+        self.title_label.setText('Step 2: Batch Details & Pricing')
         self.progress.setValue(50)
         
         batch = self.batch
-        
-        details = QVBoxLayout()
-        
-        title = QLabel('[Batch Information]')
-        title_font = QFont()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        title.setFont(title_font)
-        details.addWidget(title)
-        
-        details.addWidget(QLabel(f"Batch Code: {batch['batch_code']}"))
-        details.addWidget(QLabel(f"Farmer: {batch['farmer_name']}"))
-        details.addWidget(QLabel(f"Crop: {batch['crop_type'].upper()}"))
-        details.addWidget(QLabel(f"Weight: {batch['weight_kg']:.2f} kg"))
-        details.addWidget(QLabel(f"Quality: Grade {batch['quality_grade']}"))
-        details.addWidget(QLabel(f"Stored: {batch['storage_date']}"))
         
         # Calculate selling amount
         amount, breakdown = self.billing.calculate_selling_amount(
@@ -189,23 +244,94 @@ class SellingScreen(QWidget):
         self.flow_data['amount'] = amount
         self.flow_data['billing_breakdown'] = breakdown
         
-        details.addSpacing(20)
+        # Build details widget
+        widget = QWidget()
+        details = QVBoxLayout()
         
-        amount_label = QLabel(f"Amount to Pay Farmer: ₹{amount:.2f}")
-        amount_font = QFont()
-        amount_font.setPointSize(18)
-        amount_font.setBold(True)
-        amount_label.setFont(amount_font)
-        amount_label.setStyleSheet("color: green;")
-        details.addWidget(amount_label)
+        # Batch info section
+        batch_frame = QFrame()
+        batch_frame.setFrameShape(QFrame.Box)
+        batch_frame.setStyleSheet("background-color: #E3F2FD; border: 1px solid #90CAF9; border-radius: 5px;")
+        batch_layout = QVBoxLayout()
         
-        rate_label = QLabel(f"(Rate: ₹{breakdown['base_rate']:.2f}/kg)")
-        details.addWidget(rate_label)
+        batch_title = QLabel('📦 Batch Information')
+        batch_title.setFont(QFont('Arial', 13, QFont.Bold))
+        batch_layout.addWidget(batch_title)
         
-        self.content_area.addLayout(details, stretch=1)
+        batch_layout.addWidget(QLabel(f"   Batch Code: {batch['batch_code']}"))
+        batch_layout.addWidget(QLabel(f"   👨‍🌾 Farmer: {batch['farmer_name']}"))
+        batch_layout.addWidget(QLabel(f"   🌾 Crop: {batch['crop_type'].upper()}"))
+        batch_layout.addWidget(QLabel(f"   ⚖️ Weight: {batch['weight_kg']:.2f} kg"))
+        batch_layout.addWidget(QLabel(f"   📊 Quality: Grade {batch['quality_grade']}"))
+        batch_layout.addWidget(QLabel(f"   💧 Moisture: {batch['moisture_percent']:.2f}%"))
+        batch_layout.addWidget(QLabel(f"   📅 Stored: {batch['storage_date']}"))
+        batch_layout.addWidget(QLabel(f"   📅 Expiry: {batch['expiry_date']}"))
         
-        # Control button
-        btn_proceed = QPushButton('Proceed to Payout')
+        batch_frame.setLayout(batch_layout)
+        details.addWidget(batch_frame)
+        
+        details.addSpacing(10)
+        
+        # Rate breakdown section
+        rate_frame = QFrame()
+        rate_frame.setFrameShape(QFrame.Box)
+        rate_frame.setStyleSheet("background-color: #FFF3E0; border: 1px solid #FFB74D; border-radius: 5px;")
+        rate_layout = QVBoxLayout()
+        
+        rate_title = QLabel('💰 Selling Rate Breakdown')
+        rate_title.setFont(QFont('Arial', 13, QFont.Bold))
+        rate_layout.addWidget(rate_title)
+        
+        base_rate = breakdown.get('base_rate', 0)
+        quality_multiplier = breakdown.get('quality_multiplier', 1.0)
+        base_amount = breakdown.get('base_amount', 0)
+        adjusted_amount = breakdown.get('adjusted_amount', 0)
+        deductions = breakdown.get('deductions', 0)
+        
+        rate_layout.addWidget(QLabel(f"   📊 Market Rate: ₹{base_rate:.2f} per kg"))
+        rate_layout.addWidget(QLabel(f"   ⚖️ Weight: {batch['weight_kg']:.2f} kg"))
+        rate_layout.addWidget(QLabel(f"   💵 Base Amount: ₹{base_rate:.2f} × {batch['weight_kg']:.2f} = ₹{base_amount:.2f}"))
+        
+        if quality_multiplier != 1.0:
+            quality_percent = (quality_multiplier - 1.0) * 100
+            prefix = "+" if quality_percent > 0 else ""
+            quality_text = f"   📊 Quality {'Premium' if quality_percent > 0 else 'Penalty'}: {prefix}{quality_percent:.0f}% (Grade {batch['quality_grade']})"
+            quality_label = QLabel(quality_text)
+            if quality_percent > 0:
+                quality_label.setStyleSheet("color: green;")
+            else:
+                quality_label.setStyleSheet("color: red;")
+            rate_layout.addWidget(quality_label)
+            
+            rate_layout.addWidget(QLabel(f"   💵 After Quality: ₹{adjusted_amount:.2f}"))
+        
+        if deductions > 0:
+            ded_label = QLabel(f"   ⚠️ Deductions: -₹{deductions:.2f}")
+            ded_label.setStyleSheet("color: red;")
+            rate_layout.addWidget(ded_label)
+        
+        # Separator
+        rate_layout.addWidget(QLabel('   ' + '─' * 35))
+        
+        # Total
+        total_label = QLabel(f"   FARMER RECEIVES: ₹{amount:.2f}")
+        total_font = QFont()
+        total_font.setPointSize(18)
+        total_font.setBold(True)
+        total_label.setFont(total_font)
+        total_label.setStyleSheet("color: #2E7D32;")
+        rate_layout.addWidget(total_label)
+        
+        rate_frame.setLayout(rate_layout)
+        details.addWidget(rate_frame)
+        
+        details.addStretch(1)
+        
+        widget.setLayout(details)
+        self.content_area.addWidget(widget, stretch=1)
+        
+        # Proceed button
+        btn_proceed = QPushButton(f'💰 Proceed to Payout (₹{amount:.2f})')
         btn_proceed.setFixedHeight(60)
         btn_proceed.setFont(QFont('Arial', 14, QFont.Bold))
         btn_proceed.setStyleSheet("background-color: #33CC33; color: white;")
@@ -227,6 +353,8 @@ class SellingScreen(QWidget):
     
     def _on_payout_complete(self, payout_ref):
         """Handle payout completion."""
+        self._session_timer.stop()
+        
         # Create transaction
         txn_code = f"SELL-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
@@ -244,84 +372,97 @@ class SellingScreen(QWidget):
             'payment_ref': payout_ref
         })
         
-        # Update batch status
+        # Update batch status to sold
         db.update('batches', {
             'status': 'sold'
         }, 'id = ?', (self.batch['id'],))
         
-        # Update inventory
+        # Update inventory (reduce stock)
         db.update_crop_stock(self.batch['crop_type'], -self.batch['weight_kg'])
         
-        # Update stack
+        # Update stack (reduce weight)
         if self.batch['stack_location']:
-            self.inventory.update_stack_weight(self.batch['stack_location'], -self.batch['weight_kg'])
+            self.inventory.update_stack_weight(
+                self.batch['stack_location'],
+                -self.batch['weight_kg']
+            )
         
-        # Release RFID
-        db.update('rfid_tags', {
-            'status': 'available',
-            'assigned_to_batch_id': None
-        }, 'uid = ?', (self.batch['rfid_uid'],))
+        # Release RFID tag
+        if self.batch['rfid_uid']:
+            db.update('rfid_tags', {
+                'status': 'available',
+                'assigned_to_batch_id': None
+            }, 'uid = ?', (self.batch['rfid_uid'],))
         
-        # Send WhatsApp
-        whatsapp = get_whatsapp()
-        message = WhatsAppTemplates.format_message(
-            'SELLING_CONFIRMATION',
-            self.app.current_language,
-            {
-                'godown_name': self.app.app_config.get('godown_name', 'Godown'),
-                'farmer_name': self.farmer['name'],
-                'batch_code': self.batch['batch_code'],
-                'crop_type': self.batch['crop_type'],
-                'weight_kg': self.batch['weight_kg'],
-                'rate': self.flow_data['billing_breakdown']['base_rate'],
-                'amount': self.flow_data['amount'],
-                'payment_method': 'Bank Transfer (Simulated)',
-                'txn_code': txn_code,
-                'txn_date': datetime.now().strftime('%d/%m/%Y %H:%M')
-            }
-        )
-        
-        whatsapp.enqueue(
-            self.farmer['phone'],
-            message,
-            self.app.current_language,
-            template_name='SELLING_CONFIRMATION',
-            priority=10
-        )
+        # Send SMS notification
+        try:
+            sms = get_whatsapp()
+            breakdown = self.flow_data.get('billing_breakdown', {})
+            
+            message = WhatsAppTemplates.format_message(
+                'SELLING_CONFIRMATION',
+                self.app.current_language,
+                {
+                    'godown_name': self.app.app_config.get('godown_name', 'Godown'),
+                    'farmer_name': self.farmer['name'],
+                    'batch_code': self.batch['batch_code'],
+                    'crop_type': self.batch['crop_type'],
+                    'weight_kg': self.batch['weight_kg'],
+                    'rate': breakdown.get('base_rate', 0),
+                    'amount': self.flow_data['amount'],
+                    'payment_method': 'Bank Transfer (Simulated)',
+                    'txn_code': txn_code,
+                    'txn_date': datetime.now().strftime('%d/%m/%Y %H:%M')
+                }
+            )
+            
+            sms.enqueue(
+                self.farmer['phone'],
+                message,
+                self.app.current_language,
+                template_name='SELLING_CONFIRMATION',
+                priority=10
+            )
+        except Exception as e:
+            logger.error(f"SMS notification failed: {e}")
         
         # Commit session
         self.session.commit()
         
         # Show success
         self.progress.setValue(100)
-        QMessageBox.information(self, 'Success', 
-            f'Selling completed successfully!\n\n'
-            f'Amount: ₹{self.flow_data["amount"]:.2f}\n'
-            f'WhatsApp notification sent to farmer.')
+        breakdown = self.flow_data.get('billing_breakdown', {})
         
-        # Return to startup
+        QMessageBox.information(self, 'Sale Completed!',
+            f'✅ Sale completed successfully!\n\n'
+            f'Batch: {self.batch["batch_code"]}\n'
+            f'Crop: {self.batch["crop_type"].upper()}\n'
+            f'Weight: {self.batch["weight_kg"]:.2f} kg\n'
+            f'Rate: ₹{breakdown.get("base_rate", 0):.2f}/kg\n'
+            f'Amount: ₹{self.flow_data["amount"]:.2f}\n\n'
+            f'Transaction: {txn_code}\n'
+            f'SMS sent to {self.farmer["phone"]}'
+        )
+        
         self.app.show_screen('startup')
     
     def _clear_content(self):
-        """Clear content area."""
-        while self.content_area.count():
-            widget = self.content_area.takeAt(0).widget()
-            if widget:
-                widget.deleteLater()
-            else:
-                layout = self.content_area.takeAt(0)
-                while layout and layout.count():
-                    item = layout.takeAt(0)
-                    if item.widget():
-                        item.widget().deleteLater()
+        """Clear content area safely."""
+        if self.content_area:
+            while self.content_area.count():
+                item = self.content_area.takeAt(0)
+                if item and item.widget():
+                    item.widget().deleteLater()
         
-        while self.control_buttons.count():
-            widget = self.control_buttons.takeAt(0).widget()
-            if widget:
-                widget.deleteLater()
+        if self.control_buttons:
+            while self.control_buttons.count():
+                item = self.control_buttons.takeAt(0)
+                if item and item.widget():
+                    item.widget().deleteLater()
     
     def _on_back(self):
         """Go back to startup."""
+        self._session_timer.stop()
         if self.session:
-            self.session.rollback()
+            self.session.cancel()
         self.app.show_screen('startup')

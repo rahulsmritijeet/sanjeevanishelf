@@ -1,19 +1,19 @@
 """
 Razorpay Payment Integration
-QR generation, payment link creation (simulation-safe).
+QR generation using qrcode library only (no PIL needed).
+Uses Razorpay TEST API keys.
 """
 
 import logging
 from typing import Dict, Optional, Tuple
-import qrcode
 from io import BytesIO
-from PIL import Image
+import json
 
 logger = logging.getLogger(__name__)
 
 
 class RazorpayHandler:
-    """Handle Razorpay payment QR generation and tracking."""
+    """Handle Razorpay payments with test API keys."""
     
     def __init__(self, config: Dict, simulation: bool = False):
         self.config = config
@@ -26,130 +26,174 @@ class RazorpayHandler:
         
         self.client = None
         
-        if not simulation and self.key_id and self.key_secret:
+        # Try to initialize Razorpay client with test keys
+        if self.key_id and self.key_secret:
             try:
                 import razorpay
                 self.client = razorpay.Client(auth=(self.key_id, self.key_secret))
-                logger.info("Razorpay client initialized (REAL mode)")
+                self.simulation = False
+                logger.info(f"Razorpay client initialized (TEST mode)")
+                logger.info(f"Key ID: {self.key_id[:15]}...")
             except ImportError:
-                logger.warning("razorpay package not installed, using simulation")
+                logger.warning("razorpay package not installed. Run: pip install razorpay")
+                self.simulation = True
+            except Exception as e:
+                logger.error(f"Razorpay init failed: {e}")
                 self.simulation = True
         else:
             self.simulation = True
-            logger.info("Razorpay in SIMULATION mode")
+            logger.info("Razorpay in SIMULATION mode (no keys provided)")
     
-    def create_qr_code(self, amount: float, transaction_id: str, 
-                       description: str = "Storage Fee") -> Tuple[Optional[str], Optional[bytes]]:
+    def create_order(self, amount: float, receipt: str,
+                     notes: Dict = None) -> Optional[Dict]:
         """
-        Create payment QR code.
-        Returns (qr_url: str, qr_image_bytes: bytes)
-        In simulation: returns local QR image.
+        Create a Razorpay order.
+        Returns order data dict with 'id', 'amount', 'status'.
         """
         if self.simulation:
-            return self._create_simulation_qr(amount, transaction_id, description)
+            order = {
+                'id': f'order_sim_{receipt}',
+                'amount': int(amount * 100),
+                'currency': 'INR',
+                'receipt': receipt,
+                'status': 'created'
+            }
+            logger.info(f"[SIM] Order created: {order['id']}")
+            return order
         
         try:
-            # Create Razorpay QR code
-            qr_data = self.client.qr_code.create({
-                "type": "upi_qr",
-                "name": self.merchant_name,
-                "usage": "single_use",
-                "fixed_amount": True,
-                "payment_amount": int(amount * 100),  # Convert to paise
-                "description": description,
-                "customer_id": transaction_id,
-                "close_by": int((datetime.now() + timedelta(hours=24)).timestamp())
-            })
+            order_data = {
+                'amount': int(amount * 100),  # paise
+                'currency': 'INR',
+                'receipt': receipt,
+                'notes': notes or {}
+            }
             
-            qr_url = qr_data.get('image_url')
-            logger.info(f"Razorpay QR created: {qr_url}")
-            
-            # Download QR image
-            import requests
-            response = requests.get(qr_url)
-            qr_image = response.content if response.status_code == 200 else None
-            
-            return qr_url, qr_image
+            order = self.client.order.create(data=order_data)
+            logger.info(f"Razorpay order created: {order['id']}")
+            return order
         
         except Exception as e:
-            logger.error(f"Failed to create Razorpay QR: {e}")
-            # Fallback to simulation
-            return self._create_simulation_qr(amount, transaction_id, description)
-    
-    def _create_simulation_qr(self, amount: float, transaction_id: str,
-                             description: str) -> Tuple[str, bytes]:
-        """Create a simulated QR code image."""
-        # Create UPI payment string
-        upi_string = f"upi://pay?pa=godown@paytm&pn={self.merchant_name}&am={amount}&tn={description}&tr={transaction_id}"
-        
-        # Generate QR code
-        qr = qrcode.QRCode(version=1, box_size=10, border=5)
-        qr.add_data(upi_string)
-        qr.make(fit=True)
-        
-        img = qr.make_image(fill_color="black", back_color="white")
-        
-        # Convert to bytes
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        qr_bytes = buffer.getvalue()
-        
-        logger.info(f"[SIM] QR code created for ₹{amount}, txn: {transaction_id}")
-        
-        return upi_string, qr_bytes
+            logger.error(f"Order creation failed: {e}")
+            return None
     
     def create_payment_link(self, amount: float, customer_phone: str,
-                           customer_name: str, description: str) -> Optional[str]:
+                           customer_name: str, description: str,
+                           reference_id: str) -> Optional[str]:
         """
-        Create a payment link (for SMS/WhatsApp).
-        In simulation: returns a dummy link.
+        Create payment link for UPI/cards.
+        Returns short URL.
         """
         if self.simulation:
-            link = f"https://razorpay.com/pay/sim_{customer_phone}_{int(amount)}"
+            link = f"https://rzp.io/sim/{reference_id}"
             logger.info(f"[SIM] Payment link: {link}")
             return link
         
         try:
-            from datetime import datetime, timedelta
-            
             link_data = self.client.payment_link.create({
-                "amount": int(amount * 100),
-                "currency": "INR",
-                "description": description,
-                "customer": {
-                    "name": customer_name,
-                    "contact": customer_phone
+                'amount': int(amount * 100),
+                'currency': 'INR',
+                'description': description,
+                'customer': {
+                    'name': customer_name,
+                    'contact': customer_phone
                 },
-                "notify": {
-                    "sms": False,
-                    "email": False
+                'notify': {
+                    'sms': True,
+                    'email': False
                 },
-                "reminder_enable": False,
-                "callback_url": "",
-                "callback_method": "get"
+                'reminder_enable': False,
+                'reference_id': reference_id
             })
             
             link_url = link_data.get('short_url')
-            logger.info(f"Razorpay payment link created: {link_url}")
+            logger.info(f"Payment link created: {link_url}")
             return link_url
         
         except Exception as e:
-            logger.error(f"Failed to create payment link: {e}")
+            logger.error(f"Payment link creation failed: {e}")
             return None
     
-    def verify_payment(self, payment_id: str) -> bool:
+    def create_qr_code(self, amount: float, transaction_id: str,
+                       description: str = "Storage Fee") -> Tuple[Optional[str], Optional[bytes]]:
+        """
+        Create QR code for UPI payment.
+        Returns (upi_string, qr_image_bytes).
+        """
+        # Generate UPI payment string
+        upi_string = (
+            f"upi://pay?"
+            f"pa=godown@paytm&"
+            f"pn={self.merchant_name}&"
+            f"am={amount}&"
+            f"tn={description}&"
+            f"tr={transaction_id}"
+        )
+        
+        try:
+            import qrcode
+            
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(upi_string)
+            qr.make(fit=True)
+            
+            # Create image WITHOUT PIL - use PNG writer
+            buffer = BytesIO()
+            qr.make_image().save(buffer, format='PNG')
+            qr_bytes = buffer.getvalue()
+            
+            logger.info(f"QR code created for Rs.{amount}, txn: {transaction_id}")
+            return upi_string, qr_bytes
+        
+        except Exception as e:
+            logger.error(f"QR generation failed: {e}")
+            # Return text-based fallback
+            return upi_string, None
+    
+    def verify_payment(self, payment_id: str) -> Tuple[bool, Dict]:
         """
         Verify payment status.
-        In simulation: always returns True (manual button press).
+        Returns (success, payment_data).
         """
         if self.simulation:
             logger.info(f"[SIM] Payment verified: {payment_id}")
-            return True
+            return True, {
+                'id': payment_id,
+                'status': 'captured',
+                'amount': 0,
+                'method': 'simulation'
+            }
         
         try:
             payment = self.client.payment.fetch(payment_id)
             status = payment.get('status')
-            return status == 'captured'
+            success = status == 'captured'
+            
+            logger.info(f"Payment {payment_id} status: {status}")
+            return success, payment
+        
         except Exception as e:
             logger.error(f"Payment verification failed: {e}")
-            return False
+            return False, {}
+    
+    def verify_payment_link(self, payment_link_id: str) -> Tuple[bool, Dict]:
+        """Check if payment link has been paid."""
+        if self.simulation:
+            return False, {}
+        
+        try:
+            link = self.client.payment_link.fetch(payment_link_id)
+            status = link.get('status')
+            paid = status == 'paid'
+            
+            logger.info(f"Payment link {payment_link_id} status: {status}")
+            return paid, link
+        
+        except Exception as e:
+            logger.error(f"Payment link check failed: {e}")
+            return False, {}

@@ -348,44 +348,107 @@ class BuyingScreen(QWidget):
         self.flow_data['billing_breakdown'] = breakdown
         
         self.show_summary()
-    
+
     def show_summary(self):
-        """Show purchase summary."""
+
         self._clear_content()
-        
-        self.title_label.setText('Purchase Summary')
-        self.progress.setValue(75)
-        
-        summary = QVBoxLayout()
-        
-        data = self.flow_data
-        
-        summary.addWidget(QLabel('[Purchase Details]'))
-        summary.addWidget(QLabel(f"Farmer: {self.farmer['name']}"))
-        summary.addWidget(QLabel(f"Crop: {data['crop_type'].upper()}"))
-        summary.addWidget(QLabel(f"Weight: {data['weight_kg']:.2f} kg"))
-        summary.addWidget(QLabel(f"Quality: Grade {data['quality_grade']}"))
-        summary.addWidget(QLabel(f"Rate: ₹{data['billing_breakdown']['applied_rate']:.2f}/kg"))
-        
-        summary.addSpacing(20)
-        
-        amount_label = QLabel(f"Amount to Pay Farmer: ₹{data['amount']:.2f}")
-        amount_font = QFont()
-        amount_font.setPointSize(18)
-        amount_font.setBold(True)
-        amount_label.setFont(amount_font)
-        amount_label.setStyleSheet("color: green;")
-        summary.addWidget(amount_label)
-        
-        self.content_area.addLayout(summary, stretch=1)
-        
-        btn_payment = QPushButton('Proceed to Payment')
-        btn_payment.setFixedHeight(60)
-        btn_payment.setFont(QFont('Arial', 14, QFont.Bold))
-        btn_payment.setStyleSheet("background-color: #33CC33; color: white;")
-        btn_payment.clicked.connect(self._show_payment)
-        self.control_buttons.addWidget(btn_payment)
+        self.title_label.setText('Storage Summary')
+        self.progress.setValue(85)
     
+        widget = QWidget()
+        vlayout = QVBoxLayout()
+    
+        d = self.flow_data
+        breakdown = d.get('billing_breakdown', {})
+    
+    # Title
+        title = QLabel('📋 Storage Details')
+        title.setFont(QFont('Arial', 14, QFont.Bold))
+        vlayout.addWidget(title)
+    
+        vlayout.addSpacing(10)
+    
+    # Farmer info
+        vlayout.addWidget(QLabel(f"👨‍🌾 Farmer: {self.farmer['name']}"))
+        vlayout.addWidget(QLabel(f"📱 Phone: {self.farmer['phone']}"))
+    
+        vlayout.addSpacing(10)
+    
+    # Crop info
+        vlayout.addWidget(QLabel(f"🌾 Crop: {d['crop_type'].upper()}"))
+        vlayout.addWidget(QLabel(f"⚖️ Weight: {d['weight_kg']:.2f} kg"))
+        vlayout.addWidget(QLabel(f"💧 Moisture: {d['moisture_percent']:.2f}%"))
+        vlayout.addWidget(QLabel(f"📊 Quality: Grade {d['quality_grade']}"))
+        vlayout.addWidget(QLabel(f"📍 Stack: {d['stack_location']}"))
+        vlayout.addWidget(QLabel(f"📅 Expiry: {d['expiry_date']}"))
+    
+        vlayout.addSpacing(15)
+    
+    # Rate breakdown
+        rate_title = QLabel('💰 Billing Breakdown')
+        rate_title.setFont(QFont('Arial', 12, QFont.Bold))
+        vlayout.addWidget(rate_title)
+    
+    # Storage rate
+        rate = breakdown.get('rate_per_kg_per_month', self.app.app_config.get('billing', {}).get('storage_rate_per_kg_per_month', 2.0))
+        duration = breakdown.get('duration_months', 1.0)
+        base_fee = breakdown.get('base_fee', d.get('storage_fee', 0))
+        quality_adj = breakdown.get('quality_adjustment', 0)
+    
+        rate_label = QLabel(f"   Rate: ₹{rate:.2f} per kg per month")
+        rate_label.setStyleSheet("color: #555;")
+        vlayout.addWidget(rate_label)
+    
+        duration_label = QLabel(f"   Duration: {duration:.1f} month(s)")
+        duration_label.setStyleSheet("color: #555;")
+        vlayout.addWidget(duration_label)
+    
+        weight_label = QLabel(f"   Weight: {d['weight_kg']:.2f} kg")
+        weight_label.setStyleSheet("color: #555;")
+        vlayout.addWidget(weight_label)
+    
+        base_label = QLabel(f"   Base Fee: ₹{rate:.2f} × {d['weight_kg']:.2f} kg × {duration:.1f} mo = ₹{base_fee:.2f}")
+        base_label.setStyleSheet("color: #555;")
+        vlayout.addWidget(base_label)
+    
+        if quality_adj != 0:
+            adj_text = f"   Quality {'Premium' if quality_adj > 0 else 'Penalty'}: ₹{abs(quality_adj):.2f}"
+            if quality_adj > 0:
+                adj_text += f" (Grade {d['quality_grade']} +10%)"
+            else:
+                adj_text += f" (Grade {d['quality_grade']} -5%)"
+            adj_label = QLabel(adj_text)
+            adj_label.setStyleSheet("color: #555;")
+            vlayout.addWidget(adj_label)
+    
+        vlayout.addSpacing(10)
+    
+    # Separator line
+        line = QLabel('─' * 40)
+        line.setStyleSheet("color: #999;")
+        vlayout.addWidget(line)
+    
+    # Total fee
+        fee_label = QLabel(f"   TOTAL: ₹{d['storage_fee']:.2f}")
+        fee_font = QFont()
+        fee_font.setPointSize(20)
+        fee_font.setBold(True)
+        fee_label.setFont(fee_font)
+        fee_label.setStyleSheet("color: green;")
+        vlayout.addWidget(fee_label)
+    
+        vlayout.addStretch(1)
+        widget.setLayout(vlayout)
+        self.content_area.addWidget(widget, stretch=1)
+    
+        btn = QPushButton('Proceed to Payment')
+        btn.setFixedHeight(60)
+        btn.setFont(QFont('Arial', 14, QFont.Bold))
+        btn.setStyleSheet("background-color: #33CC33; color: white;")
+        btn.clicked.connect(self._show_payment)
+        self.control_buttons.addWidget(btn) 
+
+
     def _show_payment(self):
         """Show payment screen."""
         self.app.show_screen('payment')
