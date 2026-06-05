@@ -1,12 +1,13 @@
 """
 Storage Flow Screen - PyQt5
+With Read Data + Confirm buttons for weight and moisture.
 With 5-minute session timer.
 """
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QGridLayout, QDialog, QMessageBox,
-    QProgressBar
+    QProgressBar, QFrame
 )
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt, QTimer
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class StorageScreen(QWidget):
-    """Storage flow screen with 5-minute timer."""
+    """Storage flow screen with Read+Confirm for sensors."""
     
     def __init__(self, app):
         super().__init__()
@@ -41,6 +42,11 @@ class StorageScreen(QWidget):
         self.farmer = None
         self.current_step = 0
         self.flow_data = {}
+        
+        # Temp sensor readings (not confirmed yet)
+        self._temp_weight = None
+        self._temp_moisture = None
+        self._temp_moisture_readings = None
         
         # Session timer
         self._session_timer = QTimer(self)
@@ -64,8 +70,8 @@ class StorageScreen(QWidget):
         self.title_label.setFont(title_font)
         header_layout.addWidget(self.title_label, stretch=1)
         
-        # Timer label
-        self.timer_label = QLabel('⏱ 05:00')
+        # Timer
+        self.timer_label = QLabel('timer 05:00')
         timer_font = QFont()
         timer_font.setPointSize(14)
         timer_font.setBold(True)
@@ -74,7 +80,7 @@ class StorageScreen(QWidget):
         header_layout.addWidget(self.timer_label)
         
         # Cancel button
-        btn_cancel = QPushButton('✗ Cancel')
+        btn_cancel = QPushButton('Cancel')
         btn_cancel.setFont(QFont('Arial', 11))
         btn_cancel.setFixedWidth(100)
         btn_cancel.setFixedHeight(40)
@@ -103,10 +109,10 @@ class StorageScreen(QWidget):
         self.show_farmer_lookup()
     
     def _update_session_timer(self):
-        """Update timer every second."""
+        """Update timer."""
         if self.session:
             time_str = self.session.get_time_display()
-            self.timer_label.setText(f"⏱ {time_str}")
+            self.timer_label.setText(f"timer {time_str}")
             
             remaining = self.session.get_remaining_time()
             if remaining <= 60:
@@ -120,22 +126,17 @@ class StorageScreen(QWidget):
                 self._on_session_timeout()
     
     def _on_session_timeout(self):
-        """Handle 5-minute timeout."""
+        """Handle timeout."""
         self._session_timer.stop()
-        QMessageBox.critical(
-            self, "Session Timeout",
-            "5-minute session expired!\nAll changes rolled back.\nPlease start again."
-        )
+        QMessageBox.critical(self, "Session Timeout",
+            "5-minute session expired!\nAll changes rolled back.")
         self.app.show_screen('startup')
     
     def _cancel_session(self):
-        """Cancel session manually."""
-        reply = QMessageBox.question(
-            self, 'Cancel Session',
-            'Cancel this session?\nAll changes will be lost.',
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
+        """Cancel session."""
+        reply = QMessageBox.question(self, 'Cancel',
+            'Cancel session? All changes lost.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         
         if reply == QMessageBox.Yes:
             self._session_timer.stop()
@@ -310,87 +311,216 @@ class StorageScreen(QWidget):
         self.show_weight_measurement()
     
     def show_weight_measurement(self):
-        """Step 3: Weight."""
+        """Step 3: Weight - READ DATA + CONFIRM."""
         self._clear_content()
         self.title_label.setText('Step 3: Weight Measurement')
         self.progress.setValue(40)
+        self._temp_weight = None
         
         widget = QWidget()
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('Place crop on the scale'))
         
+        vlayout.addWidget(QLabel('Place crop sacks on the scale'))
+        vlayout.addSpacing(10)
+        
+        # Weight display
         self.weight_label = QLabel('Weight: --- kg')
         wf = QFont()
-        wf.setPointSize(24)
+        wf.setPointSize(28)
         wf.setBold(True)
         self.weight_label.setFont(wf)
-        self.weight_label.setStyleSheet("color: green;")
+        self.weight_label.setStyleSheet("color: #999999;")
         self.weight_label.setAlignment(Qt.AlignCenter)
         vlayout.addWidget(self.weight_label, stretch=1)
         
+        # Status label
+        self.weight_status = QLabel('Press "Read Data" to measure weight')
+        self.weight_status.setFont(QFont('Arial', 11))
+        self.weight_status.setStyleSheet("color: #666;")
+        self.weight_status.setAlignment(Qt.AlignCenter)
+        vlayout.addWidget(self.weight_status)
+        
         widget.setLayout(vlayout)
         self.content_area.addWidget(widget, stretch=1)
         
+        # Buttons
         btn_tare = QPushButton('Tare Scale')
         btn_tare.setFixedHeight(50)
         btn_tare.setStyleSheet("background-color: #FFAA00; color: white;")
-        btn_tare.clicked.connect(lambda: self.weight_label.setText('Weight: 0.00 kg (Tared)'))
+        btn_tare.clicked.connect(self._on_tare_scale)
         self.control_buttons.addWidget(btn_tare)
         
-        btn_read = QPushButton('Read Weight')
+        btn_read = QPushButton('Read Data')
         btn_read.setFixedHeight(50)
-        btn_read.setStyleSheet("background-color: #33CC33; color: white;")
+        btn_read.setFont(QFont('Arial', 12, QFont.Bold))
+        btn_read.setStyleSheet("background-color: #2196F3; color: white;")
         btn_read.clicked.connect(self._on_read_weight)
         self.control_buttons.addWidget(btn_read)
+        
+        self.btn_confirm_weight = QPushButton('Confirm Weight')
+        self.btn_confirm_weight.setFixedHeight(50)
+        self.btn_confirm_weight.setFont(QFont('Arial', 12, QFont.Bold))
+        self.btn_confirm_weight.setStyleSheet("background-color: #999999; color: white;")
+        self.btn_confirm_weight.setEnabled(False)
+        self.btn_confirm_weight.clicked.connect(self._on_confirm_weight)
+        self.control_buttons.addWidget(self.btn_confirm_weight)
+    
+    def _on_tare_scale(self):
+        """Tare scale."""
+        hw = get_hardware()
+        hw.weight.tare()
+        self.weight_label.setText('Weight: 0.00 kg (Tared)')
+        self.weight_label.setStyleSheet("color: #999;")
+        self.weight_status.setText('Scale tared. Place sacks and press "Read Data"')
+        self._temp_weight = None
+        self.btn_confirm_weight.setEnabled(False)
+        self.btn_confirm_weight.setStyleSheet("background-color: #999999; color: white;")
     
     def _on_read_weight(self):
+        """Read weight from sensor - shows data but doesn't confirm."""
         hw = get_hardware()
         weight = hw.weight.read_weight(samples=5)
+        
         if weight and weight > 0:
-            self.flow_data['weight_kg'] = weight
+            self._temp_weight = weight
             self.weight_label.setText(f'Weight: {weight:.2f} kg')
-            QTimer.singleShot(1500, self.show_moisture_measurement)
+            self.weight_label.setStyleSheet("color: #FF9800;")
+            self.weight_status.setText('Reading taken. Press "Read Data" to retry or "Confirm Weight" to accept')
+            self.weight_status.setStyleSheet("color: #FF9800; font-weight: bold;")
+            
+            # Enable confirm button
+            self.btn_confirm_weight.setEnabled(True)
+            self.btn_confirm_weight.setStyleSheet("background-color: #4CAF50; color: white;")
         else:
-            QMessageBox.warning(self, 'Error', 'Invalid weight')
+            self._temp_weight = None
+            self.weight_label.setText('Weight: ERROR')
+            self.weight_label.setStyleSheet("color: red;")
+            self.weight_status.setText('Reading failed! Press "Read Data" to try again')
+            self.weight_status.setStyleSheet("color: red;")
+            self.btn_confirm_weight.setEnabled(False)
+            self.btn_confirm_weight.setStyleSheet("background-color: #999999; color: white;")
+    
+    def _on_confirm_weight(self):
+        """Confirm weight reading and proceed."""
+        if self._temp_weight and self._temp_weight > 0:
+            self.flow_data['weight_kg'] = self._temp_weight
+            self.weight_label.setStyleSheet("color: green;")
+            self.weight_status.setText(f'Weight CONFIRMED: {self._temp_weight:.2f} kg')
+            self.weight_status.setStyleSheet("color: green; font-weight: bold;")
+            logger.info(f"Weight confirmed: {self._temp_weight:.2f} kg")
+            
+            # Move to moisture after short delay
+            QTimer.singleShot(1000, self.show_moisture_measurement)
+        else:
+            QMessageBox.warning(self, 'Error', 'No valid weight reading to confirm')
     
     def show_moisture_measurement(self):
-        """Step 4: Moisture."""
+        """Step 4: Moisture - READ DATA + CONFIRM."""
         self._clear_content()
         self.title_label.setText('Step 4: Moisture Measurement')
         self.progress.setValue(55)
+        self._temp_moisture = None
+        self._temp_moisture_readings = None
         
         widget = QWidget()
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('Insert moisture probe into crop'))
         
-        self.moisture_label = QLabel('Moisture: ---%')
+        vlayout.addWidget(QLabel('Insert moisture probe into crop sample'))
+        vlayout.addSpacing(10)
+        
+        # Moisture display
+        self.moisture_label = QLabel('Moisture: --- %')
         mf = QFont()
-        mf.setPointSize(24)
+        mf.setPointSize(28)
         mf.setBold(True)
         self.moisture_label.setFont(mf)
-        self.moisture_label.setStyleSheet("color: green;")
+        self.moisture_label.setStyleSheet("color: #999999;")
         self.moisture_label.setAlignment(Qt.AlignCenter)
-        vlayout.addWidget(self.moisture_label, stretch=1)
+        vlayout.addWidget(self.moisture_label)
+        
+        # Individual sensor readings
+        self.sensor_readings_label = QLabel('')
+        self.sensor_readings_label.setFont(QFont('Arial', 10))
+        self.sensor_readings_label.setStyleSheet("color: #666;")
+        self.sensor_readings_label.setAlignment(Qt.AlignCenter)
+        vlayout.addWidget(self.sensor_readings_label)
+        
+        vlayout.addStretch(1)
+        
+        # Status label
+        self.moisture_status = QLabel('Press "Read Data" to measure moisture')
+        self.moisture_status.setFont(QFont('Arial', 11))
+        self.moisture_status.setStyleSheet("color: #666;")
+        self.moisture_status.setAlignment(Qt.AlignCenter)
+        vlayout.addWidget(self.moisture_status)
         
         widget.setLayout(vlayout)
         self.content_area.addWidget(widget, stretch=1)
         
-        btn_read = QPushButton('Read Moisture')
+        # Buttons
+        btn_read = QPushButton('Read Data')
         btn_read.setFixedHeight(50)
-        btn_read.setStyleSheet("background-color: #33CC33; color: white;")
+        btn_read.setFont(QFont('Arial', 12, QFont.Bold))
+        btn_read.setStyleSheet("background-color: #2196F3; color: white;")
         btn_read.clicked.connect(self._on_read_moisture)
         self.control_buttons.addWidget(btn_read)
+        
+        self.btn_confirm_moisture = QPushButton('Confirm Moisture')
+        self.btn_confirm_moisture.setFixedHeight(50)
+        self.btn_confirm_moisture.setFont(QFont('Arial', 12, QFont.Bold))
+        self.btn_confirm_moisture.setStyleSheet("background-color: #999999; color: white;")
+        self.btn_confirm_moisture.setEnabled(False)
+        self.btn_confirm_moisture.clicked.connect(self._on_confirm_moisture)
+        self.control_buttons.addWidget(self.btn_confirm_moisture)
     
     def _on_read_moisture(self):
+        """Read moisture from sensors - shows data but doesn't confirm."""
         hw = get_hardware()
         readings = hw.moisture.read_moisture()
-        if readings:
-            avg = readings[-1]
-            self.flow_data['moisture_percent'] = avg
-            self.moisture_label.setText(f'Moisture: {avg:.2f}%')
-            QTimer.singleShot(1500, self.show_crop_selection)
+        
+        if readings and len(readings) >= 5:
+            self._temp_moisture = readings[-1]  # Average
+            self._temp_moisture_readings = readings[:-1]  # Individual sensors
+            
+            self.moisture_label.setText(f'Moisture: {readings[-1]:.2f} %')
+            self.moisture_label.setStyleSheet("color: #FF9800;")
+            
+            # Show individual sensor readings
+            sensor_text = f'Sensors: S1={readings[0]:.1f}%  S2={readings[1]:.1f}%  S3={readings[2]:.1f}%  S4={readings[3]:.1f}%'
+            self.sensor_readings_label.setText(sensor_text)
+            self.sensor_readings_label.setStyleSheet("color: #FF9800;")
+            
+            self.moisture_status.setText('Reading taken. Press "Read Data" to retry or "Confirm Moisture" to accept')
+            self.moisture_status.setStyleSheet("color: #FF9800; font-weight: bold;")
+            
+            # Enable confirm button
+            self.btn_confirm_moisture.setEnabled(True)
+            self.btn_confirm_moisture.setStyleSheet("background-color: #4CAF50; color: white;")
         else:
-            QMessageBox.warning(self, 'Error', 'Failed to read moisture')
+            self._temp_moisture = None
+            self._temp_moisture_readings = None
+            self.moisture_label.setText('Moisture: ERROR')
+            self.moisture_label.setStyleSheet("color: red;")
+            self.sensor_readings_label.setText('')
+            self.moisture_status.setText('Reading failed! Press "Read Data" to try again')
+            self.moisture_status.setStyleSheet("color: red;")
+            self.btn_confirm_moisture.setEnabled(False)
+            self.btn_confirm_moisture.setStyleSheet("background-color: #999999; color: white;")
+    
+    def _on_confirm_moisture(self):
+        """Confirm moisture reading and proceed."""
+        if self._temp_moisture is not None:
+            self.flow_data['moisture_percent'] = self._temp_moisture
+            self.flow_data['moisture_readings'] = self._temp_moisture_readings
+            self.moisture_label.setStyleSheet("color: green;")
+            self.moisture_status.setText(f'Moisture CONFIRMED: {self._temp_moisture:.2f}%')
+            self.moisture_status.setStyleSheet("color: green; font-weight: bold;")
+            logger.info(f"Moisture confirmed: {self._temp_moisture:.2f}%")
+            
+            # Move to crop selection after short delay
+            QTimer.singleShot(1000, self.show_crop_selection)
+        else:
+            QMessageBox.warning(self, 'Error', 'No valid moisture reading to confirm')
     
     def show_crop_selection(self):
         """Step 5: Crop selection."""
@@ -458,98 +588,79 @@ class StorageScreen(QWidget):
         self.show_summary()
     
     def show_summary(self):
+        """Show storage summary with rate breakdown."""
         self._clear_content()
         self.title_label.setText('Storage Summary')
         self.progress.setValue(85)
-    
+        
         widget = QWidget()
         vlayout = QVBoxLayout()
-    
+        
         d = self.flow_data
         breakdown = d.get('billing_breakdown', {})
-    
-    # Title
-        title = QLabel('📋 Storage Details')
+        
+        title = QLabel('Storage Details')
         title.setFont(QFont('Arial', 14, QFont.Bold))
         vlayout.addWidget(title)
-    
+        
         vlayout.addSpacing(10)
-    
-    # Farmer info
-        vlayout.addWidget(QLabel(f"👨‍🌾 Farmer: {self.farmer['name']}"))
-        vlayout.addWidget(QLabel(f"📱 Phone: {self.farmer['phone']}"))
-    
-        vlayout.addSpacing(10)
-    
-    # Crop info
-        vlayout.addWidget(QLabel(f"🌾 Crop: {d['crop_type'].upper()}"))
-        vlayout.addWidget(QLabel(f"⚖️ Weight: {d['weight_kg']:.2f} kg"))
-        vlayout.addWidget(QLabel(f"💧 Moisture: {d['moisture_percent']:.2f}%"))
-        vlayout.addWidget(QLabel(f"📊 Quality: Grade {d['quality_grade']}"))
-        vlayout.addWidget(QLabel(f"📍 Stack: {d['stack_location']}"))
-        vlayout.addWidget(QLabel(f"📅 Expiry: {d['expiry_date']}"))
-    
+        
+        vlayout.addWidget(QLabel(f"Farmer: {self.farmer['name']}"))
+        vlayout.addWidget(QLabel(f"Phone: {self.farmer['phone']}"))
+        vlayout.addSpacing(5)
+        vlayout.addWidget(QLabel(f"Crop: {d['crop_type'].upper()}"))
+        vlayout.addWidget(QLabel(f"Weight: {d['weight_kg']:.2f} kg"))
+        vlayout.addWidget(QLabel(f"Moisture: {d['moisture_percent']:.2f}%"))
+        vlayout.addWidget(QLabel(f"Quality: Grade {d['quality_grade']}"))
+        vlayout.addWidget(QLabel(f"Stack: {d['stack_location']}"))
+        vlayout.addWidget(QLabel(f"Expiry: {d['expiry_date']}"))
+        
         vlayout.addSpacing(15)
-    
-    # Rate breakdown
-        rate_title = QLabel('💰 Billing Breakdown')
+        
+        # Rate breakdown
+        rate_frame = QFrame()
+        rate_frame.setFrameShape(QFrame.Box)
+        rate_frame.setStyleSheet("background-color: #FFF3E0; border: 1px solid #FFB74D; border-radius: 5px;")
+        rate_layout = QVBoxLayout()
+        
+        rate_title = QLabel('Billing Breakdown')
         rate_title.setFont(QFont('Arial', 12, QFont.Bold))
-        vlayout.addWidget(rate_title)
-    
-    # Storage rate
-        rate = breakdown.get('rate_per_kg_per_month', 
-                         self.app.app_config.get('billing', {}).get('storage_rate_per_kg_per_month', 2.0))
+        rate_layout.addWidget(rate_title)
+        
+        rate = breakdown.get('rate_per_kg_per_month',
+            self.app.app_config.get('billing', {}).get('storage_rate_per_kg_per_month', 2.0))
         duration = breakdown.get('duration_months', 1.0)
         base_fee = breakdown.get('base_fee', d.get('storage_fee', 0))
         quality_adj = breakdown.get('quality_adjustment', 0)
-    
-        rate_label = QLabel(f"   Rate: ₹{rate:.2f} per kg per month")
-        rate_label.setStyleSheet("color: #555;")
-        vlayout.addWidget(rate_label)
-    
-        duration_label = QLabel(f"   Duration: {duration:.1f} month(s)")
-        duration_label.setStyleSheet("color: #555;")
-        vlayout.addWidget(duration_label)
-    
-        weight_label = QLabel(f"   Weight: {d['weight_kg']:.2f} kg")
-        weight_label.setStyleSheet("color: #555;")
-        vlayout.addWidget(weight_label)
-    
-        base_label = QLabel(f"   Base Fee: ₹{rate:.2f} × {d['weight_kg']:.2f} kg × {duration:.1f} mo = ₹{base_fee:.2f}")
-        base_label.setStyleSheet("color: #555;")
-        vlayout.addWidget(base_label)
-    
+        
+        rate_layout.addWidget(QLabel(f"   Rate: Rs.{rate:.2f}/kg/month"))
+        rate_layout.addWidget(QLabel(f"   Weight: {d['weight_kg']:.2f} kg x {duration:.1f} month"))
+        rate_layout.addWidget(QLabel(f"   Base Fee: Rs.{base_fee:.2f}"))
+        
         if quality_adj != 0:
-            adj_text = f"   Quality {'Premium' if quality_adj > 0 else 'Penalty'}: ₹{abs(quality_adj):.2f}"
-            if quality_adj > 0:
-                adj_text += f" (Grade {d['quality_grade']} +10%)"
-            else:
-                adj_text += f" (Grade {d['quality_grade']} -5%)"
-            adj_label = QLabel(adj_text)
-            adj_label.setStyleSheet("color: #555;")
-            vlayout.addWidget(adj_label)
-    
-        vlayout.addSpacing(10)
-    
-    # Separator line
-        line = QLabel('─' * 40)
-        line.setStyleSheet("color: #999;")
-        vlayout.addWidget(line)
-    
-    # Total fee
-        fee_label = QLabel(f"   TOTAL: ₹{d['storage_fee']:.2f}")
+            adj_type = "Premium" if quality_adj > 0 else "Penalty"
+            ql = QLabel(f"   Quality {adj_type} (Grade {d['quality_grade']}): Rs.{quality_adj:.2f}")
+            ql.setStyleSheet("color: green;" if quality_adj > 0 else "color: red;")
+            rate_layout.addWidget(ql)
+        
+        rate_layout.addWidget(QLabel('   ' + '-' * 35))
+        
+        fee_label = QLabel(f"   TOTAL: Rs.{d['storage_fee']:.2f}")
         fee_font = QFont()
-        fee_font.setPointSize(20)
+        fee_font.setPointSize(18)
         fee_font.setBold(True)
         fee_label.setFont(fee_font)
         fee_label.setStyleSheet("color: green;")
-        vlayout.addWidget(fee_label)
-    
+        rate_layout.addWidget(fee_label)
+        
+        rate_frame.setLayout(rate_layout)
+        vlayout.addWidget(rate_frame)
+        
         vlayout.addStretch(1)
         widget.setLayout(vlayout)
         self.content_area.addWidget(widget, stretch=1)
-    
-        btn = QPushButton('Proceed to Payment')
+        
+        btn = QPushButton(f'Proceed to Payment (Rs.{d["storage_fee"]:.2f})')
         btn.setFixedHeight(60)
         btn.setFont(QFont('Arial', 14, QFont.Bold))
         btn.setStyleSheet("background-color: #33CC33; color: white;")
@@ -569,7 +680,7 @@ class StorageScreen(QWidget):
         )
     
     def _on_payment_complete(self, payment_ref):
-        """Handle payment completion - CREATES EVERYTHING IN DB."""
+        """Handle payment completion."""
         self._session_timer.stop()
         
         batch_code = f"BATCH-{datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -616,7 +727,7 @@ class StorageScreen(QWidget):
         hw.rfid.write_data(self.flow_data['rfid_uid'], batch_code)
         
         try:
-            whatsapp = get_whatsapp()
+            sms = get_whatsapp()
             message = WhatsAppTemplates.format_message(
                 'STORAGE_CONFIRMATION',
                 self.app.current_language,
@@ -635,9 +746,9 @@ class StorageScreen(QWidget):
                     'stack_location': self.flow_data['stack_location']
                 }
             )
-            whatsapp.enqueue(self.farmer['phone'], message, self.app.current_language)
+            sms.enqueue(self.farmer['phone'], message, self.app.current_language)
         except Exception as e:
-            logger.error(f"SMS notification failed: {e}")
+            logger.error(f"SMS failed: {e}")
         
         self.session.commit()
         
@@ -645,13 +756,13 @@ class StorageScreen(QWidget):
         QMessageBox.information(self, 'Success',
             f'Storage completed!\n\n'
             f'Batch: {batch_code}\n'
-            f'Fee: ₹{self.flow_data["storage_fee"]:.2f}\n\n'
+            f'Fee: Rs.{self.flow_data["storage_fee"]:.2f}\n\n'
             f'SMS sent to farmer.')
         
         self.app.show_screen('startup')
     
     def _clear_content(self):
-        """Clear content area safely."""
+        """Clear content area."""
         if self.content_area:
             while self.content_area.count():
                 item = self.content_area.takeAt(0)
