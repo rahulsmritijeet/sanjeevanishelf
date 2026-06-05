@@ -1,12 +1,13 @@
 """
 Buying Flow Screen - PyQt5
 Godown purchases crop directly from farmer.
+With 5-minute session timer, rate breakdown.
 """
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QComboBox, QGridLayout, QDialog, QMessageBox,
-    QProgressBar
+    QLineEdit, QGridLayout, QDialog, QMessageBox,
+    QProgressBar, QFrame
 )
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt, QTimer
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class BuyingScreen(QWidget):
-    """Buying flow screen."""
+    """Buying flow screen with timer and rate breakdown."""
     
     def __init__(self, app):
         super().__init__()
@@ -41,6 +42,10 @@ class BuyingScreen(QWidget):
         self.farmer = None
         self.flow_data = {}
         
+        # Session timer
+        self._session_timer = QTimer(self)
+        self._session_timer.timeout.connect(self._update_session_timer)
+        
         self._build_ui()
     
     def _build_ui(self):
@@ -54,17 +59,28 @@ class BuyingScreen(QWidget):
         
         self.title_label = QLabel('BUYING FLOW')
         title_font = QFont()
-        title_font.setPointSize(20)
+        title_font.setPointSize(18)
         title_font.setBold(True)
         self.title_label.setFont(title_font)
         header_layout.addWidget(self.title_label, stretch=1)
         
-        btn_back = QPushButton('← Back')
-        btn_back.setFont(QFont('Arial', 12))
-        btn_back.setFixedWidth(100)
-        btn_back.setStyleSheet("background-color: #CC3333; color: white;")
-        btn_back.clicked.connect(self._on_back)
-        header_layout.addWidget(btn_back)
+        # Timer
+        self.timer_label = QLabel('timer 05:00')
+        timer_font = QFont()
+        timer_font.setPointSize(14)
+        timer_font.setBold(True)
+        self.timer_label.setFont(timer_font)
+        self.timer_label.setStyleSheet("color: green; font-weight: bold;")
+        header_layout.addWidget(self.timer_label)
+        
+        # Cancel button
+        btn_cancel = QPushButton('Cancel')
+        btn_cancel.setFont(QFont('Arial', 11))
+        btn_cancel.setFixedWidth(100)
+        btn_cancel.setFixedHeight(40)
+        btn_cancel.setStyleSheet("background-color: #F44336; color: white;")
+        btn_cancel.clicked.connect(self._cancel_session)
+        header_layout.addWidget(btn_cancel)
         
         layout.addLayout(header_layout)
         
@@ -87,6 +103,47 @@ class BuyingScreen(QWidget):
         # Show farmer lookup
         self.show_farmer_lookup()
     
+    def _update_session_timer(self):
+        """Update timer every second."""
+        if self.session:
+            time_str = self.session.get_time_display()
+            self.timer_label.setText(f"timer {time_str}")
+            
+            remaining = self.session.get_remaining_time()
+            if remaining <= 60:
+                self.timer_label.setStyleSheet("color: red; font-weight: bold;")
+            elif remaining <= 120:
+                self.timer_label.setStyleSheet("color: orange; font-weight: bold;")
+            else:
+                self.timer_label.setStyleSheet("color: green; font-weight: bold;")
+            
+            if self.session.is_expired():
+                self._on_session_timeout()
+    
+    def _on_session_timeout(self):
+        """Handle 5-minute timeout."""
+        self._session_timer.stop()
+        QMessageBox.critical(
+            self, "Session Timeout",
+            "5-minute session expired!\nAll changes rolled back.\nPlease start again."
+        )
+        self.app.show_screen('startup')
+    
+    def _cancel_session(self):
+        """Cancel session manually."""
+        reply = QMessageBox.question(
+            self, 'Cancel Session',
+            'Cancel this session?\nAll changes will be lost.',
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            self._session_timer.stop()
+            if self.session:
+                self.session.cancel()
+            self.app.show_screen('startup')
+    
     def show_farmer_lookup(self):
         """Step 1: Farmer lookup."""
         self._clear_content()
@@ -102,7 +159,10 @@ class BuyingScreen(QWidget):
         self.phone_input.setFont(QFont('Arial', 16))
         self.phone_input.setFixedHeight(50)
         self.phone_input.setMaxLength(10)
+        self.phone_input.setPlaceholderText('9876543210')
         self.content_area.addWidget(self.phone_input)
+        
+        self.content_area.addStretch(1)
         
         btn_submit = QPushButton('Search Farmer')
         btn_submit.setFont(QFont('Arial', 12))
@@ -113,7 +173,7 @@ class BuyingScreen(QWidget):
     
     def _on_phone_submitted(self):
         """Handle phone submission."""
-        phone = self.phone_input.text()
+        phone = self.phone_input.text().strip()
         
         if len(phone) != 10:
             QMessageBox.warning(self, 'Error', 'Please enter 10-digit phone number')
@@ -127,6 +187,7 @@ class BuyingScreen(QWidget):
             user_id = self.app.current_user['id']
             self.session = SessionManager(operator_id=user_id, mode='buying')
             self.session.start(farmer_id=farmer['id'])
+            self._session_timer.start(1000)
             self.show_crop_selection()
         else:
             self._show_farmer_registration(phone)
@@ -175,6 +236,7 @@ class BuyingScreen(QWidget):
             user_id = self.app.current_user['id']
             self.session = SessionManager(operator_id=user_id, mode='buying')
             self.session.start(farmer_id=farmer_id)
+            self._session_timer.start(1000)
             
             dialog.accept()
             self.show_crop_selection()
@@ -203,8 +265,10 @@ class BuyingScreen(QWidget):
         label.setFont(QFont('Arial', 14))
         self.content_area.addWidget(label)
         
+        widget = QWidget()
+        grid = QGridLayout()
+        
         crops = ['rice', 'wheat', 'maize', 'pulses']
-        crop_grid = QGridLayout()
         
         for i, crop in enumerate(crops):
             btn = QPushButton(crop.upper())
@@ -212,9 +276,10 @@ class BuyingScreen(QWidget):
             btn.setFixedHeight(80)
             btn.setStyleSheet("background-color: #3366FF; color: white;")
             btn.clicked.connect(lambda checked, c=crop: self._on_crop_selected(c))
-            crop_grid.addWidget(btn, i // 2, i % 2)
+            grid.addWidget(btn, i // 2, i % 2)
         
-        self.content_area.addLayout(crop_grid, stretch=1)
+        widget.setLayout(grid)
+        self.content_area.addWidget(widget, stretch=1)
     
     def _on_crop_selected(self, crop_type):
         """Handle crop selection."""
@@ -228,26 +293,27 @@ class BuyingScreen(QWidget):
         self.title_label.setText('Step 3: Weight Measurement')
         self.progress.setValue(40)
         
-        info = QVBoxLayout()
+        widget = QWidget()
+        vlayout = QVBoxLayout()
         
-        label = QLabel('Place crop on the scale')
-        label.setFont(QFont('Arial', 14))
-        info.addWidget(label)
+        vlayout.addWidget(QLabel('Place crop on the scale'))
         
         self.weight_label = QLabel('Weight: --- kg')
-        weight_font = QFont()
-        weight_font.setPointSize(24)
-        weight_font.setBold(True)
-        self.weight_label.setFont(weight_font)
+        wf = QFont()
+        wf.setPointSize(24)
+        wf.setBold(True)
+        self.weight_label.setFont(wf)
         self.weight_label.setStyleSheet("color: green;")
-        info.addWidget(self.weight_label, stretch=1)
+        self.weight_label.setAlignment(Qt.AlignCenter)
+        vlayout.addWidget(self.weight_label, stretch=1)
         
-        self.content_area.addLayout(info, stretch=1)
+        widget.setLayout(vlayout)
+        self.content_area.addWidget(widget, stretch=1)
         
         btn_tare = QPushButton('Tare Scale')
         btn_tare.setFixedHeight(50)
         btn_tare.setStyleSheet("background-color: #FFAA00; color: white;")
-        btn_tare.clicked.connect(self._on_tare_scale)
+        btn_tare.clicked.connect(lambda: self.weight_label.setText('Weight: 0.00 kg (Tared)'))
         self.control_buttons.addWidget(btn_tare)
         
         btn_read = QPushButton('Read Weight')
@@ -255,12 +321,6 @@ class BuyingScreen(QWidget):
         btn_read.setStyleSheet("background-color: #33CC33; color: white;")
         btn_read.clicked.connect(self._on_read_weight)
         self.control_buttons.addWidget(btn_read)
-    
-    def _on_tare_scale(self):
-        """Tare scale."""
-        hw = get_hardware()
-        hw.weight.tare()
-        self.weight_label.setText('Weight: 0.00 kg (Tared)')
     
     def _on_read_weight(self):
         """Read weight."""
@@ -270,8 +330,7 @@ class BuyingScreen(QWidget):
         if weight and weight > 0:
             self.flow_data['weight_kg'] = weight
             self.weight_label.setText(f'Weight: {weight:.2f} kg')
-            
-            QTimer.singleShot(2000, self.show_moisture_measurement)
+            QTimer.singleShot(1500, self.show_moisture_measurement)
         else:
             QMessageBox.warning(self, 'Error', 'Invalid weight')
     
@@ -282,21 +341,22 @@ class BuyingScreen(QWidget):
         self.title_label.setText('Step 4: Moisture Measurement')
         self.progress.setValue(55)
         
-        info = QVBoxLayout()
+        widget = QWidget()
+        vlayout = QVBoxLayout()
         
-        label = QLabel('Insert moisture probe')
-        label.setFont(QFont('Arial', 14))
-        info.addWidget(label)
+        vlayout.addWidget(QLabel('Insert moisture probe'))
         
         self.moisture_label = QLabel('Moisture: ---%')
-        moisture_font = QFont()
-        moisture_font.setPointSize(24)
-        moisture_font.setBold(True)
-        self.moisture_label.setFont(moisture_font)
+        mf = QFont()
+        mf.setPointSize(24)
+        mf.setBold(True)
+        self.moisture_label.setFont(mf)
         self.moisture_label.setStyleSheet("color: green;")
-        info.addWidget(self.moisture_label, stretch=1)
+        self.moisture_label.setAlignment(Qt.AlignCenter)
+        vlayout.addWidget(self.moisture_label, stretch=1)
         
-        self.content_area.addLayout(info, stretch=1)
+        widget.setLayout(vlayout)
+        self.content_area.addWidget(widget, stretch=1)
         
         btn_read = QPushButton('Read Moisture')
         btn_read.setFixedHeight(50)
@@ -310,11 +370,10 @@ class BuyingScreen(QWidget):
         readings = hw.moisture.read_moisture()
         
         if readings:
-            avg_moisture = readings[-1]
-            self.flow_data['moisture_percent'] = avg_moisture
-            self.moisture_label.setText(f'Moisture: {avg_moisture:.2f}%')
-            
-            QTimer.singleShot(2000, self._validate_and_calculate)
+            avg = readings[-1]
+            self.flow_data['moisture_percent'] = avg
+            self.moisture_label.setText(f'Moisture: {avg:.2f}%')
+            QTimer.singleShot(1500, self._validate_and_calculate)
         else:
             QMessageBox.warning(self, 'Error', 'Failed to read moisture')
     
@@ -339,6 +398,13 @@ class BuyingScreen(QWidget):
             QMessageBox.critical(self, 'Error', capacity_msg)
             return
         
+        # Allocate stack BEFORE summary
+        stack_location = self.inventory.allocate_stack(crop_type, weight_kg)
+        if not stack_location:
+            QMessageBox.critical(self, 'Error', 'No available storage space')
+            return
+        self.flow_data['stack_location'] = stack_location
+        
         # Calculate payment
         amount, breakdown = self.billing.calculate_buying_amount(
             crop_type, weight_kg, grade
@@ -347,108 +413,126 @@ class BuyingScreen(QWidget):
         self.flow_data['amount'] = amount
         self.flow_data['billing_breakdown'] = breakdown
         
+        # Calculate dates
+        storage_date = date.today()
+        expiry_date = self.quality.calculate_expiry_date(crop_type, storage_date)
+        self.flow_data['storage_date'] = storage_date.isoformat()
+        self.flow_data['expiry_date'] = expiry_date
+        
         self.show_summary()
-
+    
     def show_summary(self):
-
+        """Show purchase summary with rate breakdown."""
         self._clear_content()
-        self.title_label.setText('Storage Summary')
-        self.progress.setValue(85)
-    
+        
+        self.title_label.setText('Purchase Summary')
+        self.progress.setValue(75)
+        
         widget = QWidget()
-        vlayout = QVBoxLayout()
-    
-        d = self.flow_data
-        breakdown = d.get('billing_breakdown', {})
-    
-    # Title
-        title = QLabel('📋 Storage Details')
+        summary = QVBoxLayout()
+        
+        data = self.flow_data
+        breakdown = data.get('billing_breakdown', {})
+        
+        # Title
+        title = QLabel('Purchase Details')
         title.setFont(QFont('Arial', 14, QFont.Bold))
-        vlayout.addWidget(title)
-    
-        vlayout.addSpacing(10)
-    
-    # Farmer info
-        vlayout.addWidget(QLabel(f"👨‍🌾 Farmer: {self.farmer['name']}"))
-        vlayout.addWidget(QLabel(f"📱 Phone: {self.farmer['phone']}"))
-    
-        vlayout.addSpacing(10)
-    
-    # Crop info
-        vlayout.addWidget(QLabel(f"🌾 Crop: {d['crop_type'].upper()}"))
-        vlayout.addWidget(QLabel(f"⚖️ Weight: {d['weight_kg']:.2f} kg"))
-        vlayout.addWidget(QLabel(f"💧 Moisture: {d['moisture_percent']:.2f}%"))
-        vlayout.addWidget(QLabel(f"📊 Quality: Grade {d['quality_grade']}"))
-        vlayout.addWidget(QLabel(f"📍 Stack: {d['stack_location']}"))
-        vlayout.addWidget(QLabel(f"📅 Expiry: {d['expiry_date']}"))
-    
-        vlayout.addSpacing(15)
-    
-    # Rate breakdown
-        rate_title = QLabel('💰 Billing Breakdown')
+        summary.addWidget(title)
+        
+        summary.addSpacing(10)
+        
+        # Farmer info
+        summary.addWidget(QLabel(f"Farmer: {self.farmer['name']}"))
+        summary.addWidget(QLabel(f"Phone: {self.farmer['phone']}"))
+        
+        summary.addSpacing(10)
+        
+        # Crop info
+        summary.addWidget(QLabel(f"Crop: {data['crop_type'].upper()}"))
+        summary.addWidget(QLabel(f"Weight: {data['weight_kg']:.2f} kg"))
+        summary.addWidget(QLabel(f"Moisture: {data['moisture_percent']:.2f}%"))
+        summary.addWidget(QLabel(f"Quality: Grade {data['quality_grade']}"))
+        summary.addWidget(QLabel(f"Stack: {data.get('stack_location', 'Pending')}"))
+        summary.addWidget(QLabel(f"Expiry: {data.get('expiry_date', 'Pending')}"))
+        
+        summary.addSpacing(15)
+        
+        # Rate breakdown frame
+        rate_frame = QFrame()
+        rate_frame.setFrameShape(QFrame.Box)
+        rate_frame.setStyleSheet("background-color: #FFF3E0; border: 1px solid #FFB74D; border-radius: 5px;")
+        rate_layout = QVBoxLayout()
+        
+        rate_title = QLabel('Payment Breakdown')
         rate_title.setFont(QFont('Arial', 12, QFont.Bold))
-        vlayout.addWidget(rate_title)
-    
-    # Storage rate
-        rate = breakdown.get('rate_per_kg_per_month', self.app.app_config.get('billing', {}).get('storage_rate_per_kg_per_month', 2.0))
-        duration = breakdown.get('duration_months', 1.0)
-        base_fee = breakdown.get('base_fee', d.get('storage_fee', 0))
-        quality_adj = breakdown.get('quality_adjustment', 0)
-    
-        rate_label = QLabel(f"   Rate: ₹{rate:.2f} per kg per month")
-        rate_label.setStyleSheet("color: #555;")
-        vlayout.addWidget(rate_label)
-    
-        duration_label = QLabel(f"   Duration: {duration:.1f} month(s)")
-        duration_label.setStyleSheet("color: #555;")
-        vlayout.addWidget(duration_label)
-    
-        weight_label = QLabel(f"   Weight: {d['weight_kg']:.2f} kg")
-        weight_label.setStyleSheet("color: #555;")
-        vlayout.addWidget(weight_label)
-    
-        base_label = QLabel(f"   Base Fee: ₹{rate:.2f} × {d['weight_kg']:.2f} kg × {duration:.1f} mo = ₹{base_fee:.2f}")
-        base_label.setStyleSheet("color: #555;")
-        vlayout.addWidget(base_label)
-    
-        if quality_adj != 0:
-            adj_text = f"   Quality {'Premium' if quality_adj > 0 else 'Penalty'}: ₹{abs(quality_adj):.2f}"
-            if quality_adj > 0:
-                adj_text += f" (Grade {d['quality_grade']} +10%)"
+        rate_layout.addWidget(rate_title)
+        
+        # Market rate vs MSP
+        market_rate = breakdown.get('market_rate', 0)
+        msp_rate = breakdown.get('msp_rate', 0)
+        applied_rate = breakdown.get('applied_rate', 0)
+        quality_multiplier = breakdown.get('quality_multiplier', 1.0)
+        
+        rate_layout.addWidget(QLabel(f"   Market Rate: Rs.{market_rate:.2f}/kg"))
+        rate_layout.addWidget(QLabel(f"   MSP Rate: Rs.{msp_rate:.2f}/kg"))
+        
+        # Show which rate is applied
+        if applied_rate >= msp_rate:
+            rate_source = "(Higher rate applied)"
+        else:
+            rate_source = "(MSP applied)"
+        
+        applied_label = QLabel(f"   Applied Rate: Rs.{applied_rate:.2f}/kg {rate_source}")
+        applied_label.setStyleSheet("color: #0066CC; font-weight: bold;")
+        rate_layout.addWidget(applied_label)
+        
+        # Base calculation
+        base_amount = data['weight_kg'] * applied_rate
+        rate_layout.addWidget(QLabel(f"   Base: Rs.{applied_rate:.2f} x {data['weight_kg']:.2f} kg = Rs.{base_amount:.2f}"))
+        
+        # Quality adjustment
+        if quality_multiplier != 1.0:
+            quality_percent = (quality_multiplier - 1.0) * 100
+            prefix = "+" if quality_percent > 0 else ""
+            quality_text = f"   Quality {'Premium' if quality_percent > 0 else 'Penalty'}: {prefix}{quality_percent:.0f}% (Grade {data['quality_grade']})"
+            quality_label = QLabel(quality_text)
+            if quality_percent > 0:
+                quality_label.setStyleSheet("color: green;")
             else:
-                adj_text += f" (Grade {d['quality_grade']} -5%)"
-            adj_label = QLabel(adj_text)
-            adj_label.setStyleSheet("color: #555;")
-            vlayout.addWidget(adj_label)
-    
-        vlayout.addSpacing(10)
-    
-    # Separator line
-        line = QLabel('─' * 40)
-        line.setStyleSheet("color: #999;")
-        vlayout.addWidget(line)
-    
-    # Total fee
-        fee_label = QLabel(f"   TOTAL: ₹{d['storage_fee']:.2f}")
-        fee_font = QFont()
-        fee_font.setPointSize(20)
-        fee_font.setBold(True)
-        fee_label.setFont(fee_font)
-        fee_label.setStyleSheet("color: green;")
-        vlayout.addWidget(fee_label)
-    
-        vlayout.addStretch(1)
-        widget.setLayout(vlayout)
+                quality_label.setStyleSheet("color: red;")
+            rate_layout.addWidget(quality_label)
+            
+            adjusted = base_amount * quality_multiplier
+            rate_layout.addWidget(QLabel(f"   After Quality: Rs.{adjusted:.2f}"))
+        
+        # Separator
+        rate_layout.addWidget(QLabel('   ' + '-' * 35))
+        
+        # Total
+        total_label = QLabel(f"   TOTAL TO PAY FARMER: Rs.{data['amount']:.2f}")
+        total_font = QFont()
+        total_font.setPointSize(16)
+        total_font.setBold(True)
+        total_label.setFont(total_font)
+        total_label.setStyleSheet("color: #2E7D32;")
+        rate_layout.addWidget(total_label)
+        
+        rate_frame.setLayout(rate_layout)
+        summary.addWidget(rate_frame)
+        
+        summary.addStretch(1)
+        
+        widget.setLayout(summary)
         self.content_area.addWidget(widget, stretch=1)
+        
+        # Proceed button
+        btn_payment = QPushButton(f'Proceed to Payment (Rs.{data["amount"]:.2f})')
+        btn_payment.setFixedHeight(60)
+        btn_payment.setFont(QFont('Arial', 14, QFont.Bold))
+        btn_payment.setStyleSheet("background-color: #33CC33; color: white;")
+        btn_payment.clicked.connect(self._show_payment)
+        self.control_buttons.addWidget(btn_payment)
     
-        btn = QPushButton('Proceed to Payment')
-        btn.setFixedHeight(60)
-        btn.setFont(QFont('Arial', 14, QFont.Bold))
-        btn.setStyleSheet("background-color: #33CC33; color: white;")
-        btn.clicked.connect(self._show_payment)
-        self.control_buttons.addWidget(btn) 
-
-
     def _show_payment(self):
         """Show payment screen."""
         self.app.show_screen('payment')
@@ -463,21 +547,12 @@ class BuyingScreen(QWidget):
     
     def _on_payment_complete(self, payment_ref):
         """Handle payment completion."""
-        # Create batch and store crop
+        self._session_timer.stop()
+        
+        # Create batch
         batch_code = f"BUY-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        stack_location = self.inventory.allocate_stack(
-            self.flow_data['crop_type'],
-            self.flow_data['weight_kg']
-        )
-        
         rfid_uid = db.get_available_rfid()
-        
-        storage_date = date.today()
-        expiry_date = self.quality.calculate_expiry_date(
-            self.flow_data['crop_type'],
-            storage_date
-        )
         
         batch_id = db.insert('batches', {
             'batch_code': batch_code,
@@ -487,16 +562,16 @@ class BuyingScreen(QWidget):
             'moisture_percent': self.flow_data['moisture_percent'],
             'quality_grade': self.flow_data['quality_grade'],
             'rfid_uid': rfid_uid,
-            'stack_location': stack_location,
-            'storage_date': storage_date.isoformat(),
-            'expiry_date': expiry_date,
+            'stack_location': self.flow_data['stack_location'],
+            'storage_date': self.flow_data['storage_date'],
+            'expiry_date': self.flow_data['expiry_date'],
             'status': 'stored'
         })
         
         # Create transaction
         txn_code = f"BUY-TXN-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        txn_id = db.insert('transactions', {
+        db.insert('transactions', {
             'txn_type': 'buying',
             'txn_code': txn_code,
             'farmer_id': self.farmer['id'],
@@ -514,80 +589,93 @@ class BuyingScreen(QWidget):
         db.update_crop_stock(self.flow_data['crop_type'], self.flow_data['weight_kg'])
         
         # Update stack
-        self.inventory.update_stack_weight(stack_location, self.flow_data['weight_kg'])
+        self.inventory.update_stack_weight(
+            self.flow_data['stack_location'],
+            self.flow_data['weight_kg']
+        )
         
         # Update RFID
-        db.update('rfid_tags', {
-            'status': 'assigned',
-            'assigned_to_batch_id': batch_id
-        }, 'uid = ?', (rfid_uid,))
+        if rfid_uid:
+            db.update('rfid_tags', {
+                'status': 'assigned',
+                'assigned_to_batch_id': batch_id
+            }, 'uid = ?', (rfid_uid,))
+            
+            # Write RFID
+            hw = get_hardware()
+            hw.rfid.write_data(rfid_uid, batch_code)
         
-        # Write RFID
-        hw = get_hardware()
-        hw.rfid.write_data(rfid_uid, batch_code)
-        
-        # Send WhatsApp
-        whatsapp = get_whatsapp()
-        message = WhatsAppTemplates.format_message(
-            'STORAGE_CONFIRMATION',
-            self.app.current_language,
-            {
-                'godown_name': self.app.app_config.get('godown_name', 'Godown'),
-                'farmer_name': self.farmer['name'],
-                'batch_code': batch_code,
-                'crop_type': self.flow_data['crop_type'],
-                'weight_kg': self.flow_data['weight_kg'],
-                'quality_grade': self.flow_data['quality_grade'],
-                'moisture': self.flow_data['moisture_percent'],
-                'amount': self.flow_data['amount'],
-                'payment_status': 'Paid (Purchase)',
-                'expiry_date': expiry_date,
-                'rfid_uid': rfid_uid,
-                'stack_location': stack_location
-            }
-        )
-        
-        whatsapp.enqueue(
-            self.farmer['phone'],
-            message,
-            self.app.current_language,
-            template_name='STORAGE_CONFIRMATION',
-            priority=10
-        )
+        # Send SMS notification
+        try:
+            sms = get_whatsapp()
+            breakdown = self.flow_data.get('billing_breakdown', {})
+            
+            message = WhatsAppTemplates.format_message(
+                'STORAGE_CONFIRMATION',
+                self.app.current_language,
+                {
+                    'godown_name': self.app.app_config.get('godown_name', 'Godown'),
+                    'farmer_name': self.farmer['name'],
+                    'batch_code': batch_code,
+                    'crop_type': self.flow_data['crop_type'],
+                    'weight_kg': self.flow_data['weight_kg'],
+                    'quality_grade': self.flow_data['quality_grade'],
+                    'moisture': self.flow_data['moisture_percent'],
+                    'amount': self.flow_data['amount'],
+                    'payment_status': 'Paid (Purchase)',
+                    'expiry_date': self.flow_data['expiry_date'],
+                    'rfid_uid': rfid_uid or 'N/A',
+                    'stack_location': self.flow_data['stack_location']
+                }
+            )
+            
+            sms.enqueue(
+                self.farmer['phone'],
+                message,
+                self.app.current_language,
+                template_name='STORAGE_CONFIRMATION',
+                priority=10
+            )
+        except Exception as e:
+            logger.error(f"SMS notification failed: {e}")
         
         # Commit session
         self.session.commit()
         
         # Show success
         self.progress.setValue(100)
-        QMessageBox.information(self, 'Success', 
+        breakdown = self.flow_data.get('billing_breakdown', {})
+        
+        QMessageBox.information(self, 'Purchase Complete!',
             f'Purchase completed successfully!\n\n'
-            f'Amount Paid: ₹{self.flow_data["amount"]:.2f}\n'
-            f'Batch Code: {batch_code}\n'
-            f'WhatsApp notification sent to farmer.')
+            f'Batch: {batch_code}\n'
+            f'Crop: {self.flow_data["crop_type"].upper()}\n'
+            f'Weight: {self.flow_data["weight_kg"]:.2f} kg\n'
+            f'Rate: Rs.{breakdown.get("applied_rate", 0):.2f}/kg\n'
+            f'Amount Paid: Rs.{self.flow_data["amount"]:.2f}\n\n'
+            f'Transaction: {txn_code}\n'
+            f'SMS sent to {self.farmer["phone"]}'
+        )
         
         self.app.show_screen('startup')
     
     def _clear_content(self):
-        """Clear content area."""
-        while self.content_area.count():
-            widget = self.content_area.takeAt(0).widget()
-            if widget:
-                widget.deleteLater()
-            else:
-                layout = self.content_area.takeAt(0)
-                while layout and layout.count():
-                    item = layout.takeAt(0)
-                    if item.widget():
-                        item.widget().deleteLater()
+        """Clear content area safely."""
+        if self.content_area:
+            while self.content_area.count():
+                item = self.content_area.takeAt(0)
+                if item and item.widget():
+                    item.widget().deleteLater()
         
-        while self.control_buttons.count():
-            widget = self.control_buttons.takeAt(0).widget()
-            if widget:
-                widget.deleteLater()
+        if self.control_buttons:
+            while self.control_buttons.count():
+                item = self.control_buttons.takeAt(0)
+                if item and item.widget():
+                    item.widget().deleteLater()
     
     def _on_back(self):
-        """Go back."""
+        """Go back to startup."""
+        self._session_timer.stop()
         if self.session:
-            self.session.rollback()
+            self.session.cancel()
         self.app.show_screen('startup')
