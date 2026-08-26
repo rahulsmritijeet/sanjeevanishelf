@@ -61,8 +61,3 @@ python -c "from database.migrations import apply_migrations; apply_migrations()"
 # 6. Run the application
 python ui/app.py
 
-# Initialize database
-python3 -c "from database.migrations import apply_migrations; apply_migrations()"
-
-# Run in simulation mode
-python3 ui/app.py
