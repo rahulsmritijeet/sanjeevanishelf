@@ -38,6 +38,28 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+```
+simulate this on windows too gng
+
+```bash
+# 1. Clone the repository
+git clone <repo-url>
+cd sanjeevani_shelf
+
+# 2. Create virtual environment
+python -m venv venv
+
+# 3. Activate virtual environment
+venv\Scripts\activate
+
+# 4. Install dependencies
+pip install -r requirements.txt
+
+# 5. Initialize database
+python -c "from database.migrations import apply_migrations; apply_migrations()"
+
+# 6. Run the application
+python ui/app.py
 
 # Initialize database
 python3 -c "from database.migrations import apply_migrations; apply_migrations()"
